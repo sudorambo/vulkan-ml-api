@@ -1,0 +1,2497 @@
+// Copyright 2022-2026 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+= VK_KHR_ml_primitives
+:toc: left
+:toclevels: 4
+:sectnums:
+:sectanchors:
+:source-highlighter: rouge
+
+== Name Strings
+
+`VK_KHR_ml_primitives`
+
+== Extension Type
+
+Device extension
+
+== Registered Extension Number
+
+TBD (proposed: 560)
+
+== Revision
+
+1
+
+== Extension and Version Dependencies
+
+- Requires support for Vulkan 1.3
+- Requires `VK_KHR_cooperative_matrix`
+- Requires `VK_KHR_timeline_semaphore` (promoted to Vulkan 1.2 core)
+- Requires `VK_KHR_maintenance5`
+- Requires `VK_KHR_format_feature_flags2`
+- Requires `SPV_KHR_tensor` SPIR-V extension
+
+== API Interactions
+
+- Interacts with `VK_KHR_deferred_host_operations`
+- Interacts with `VK_EXT_descriptor_buffer`
+- Interacts with `VK_KHR_external_memory`
+
+== Contributors
+
+- Jeff Leger, Qualcomm Technologies, Inc.
+- Kevin Petit, Arm Ltd.
+- Alan Baker, Google LLC
+- Lei Zhang, Google LLC
+- David Neto, Google LLC
+- Ruihao Zhang, Qualcomm Technologies, Inc.
+- Ralph Potter, Samsung Electronics
+- Graeme Leese, Broadcom
+- Tobias Hector, AMD
+- Daniel Koch, NVIDIA
+
+== Contact
+
+- Jeff Leger, Qualcomm Technologies, Inc.
+
+== Provisional
+
+This extension is _provisional_ and *must* not be used in production
+applications.  The functionality may change in ways that break backwards
+compatibility between revisions, and before final release.
+
+== Status
+
+Draft
+
+== Last Modified Date
+
+2026-03-05
+
+
+[[overview]]
+== Overview
+
+This extension introduces a unified machine learning (ML) execution
+framework for Vulkan.  It defines:
+
+  * A native *tensor resource type* (`VkTensorKHR`) to represent the
+    high-dimensionality structured data (up to 8-dimensional) consumed and
+    produced by ML workloads.
+  * *ML primitive operations* -- IHV-optimized, fixed-function pipeline
+    objects encapsulating standard neural-network layers (convolutions,
+    matrix multiplications, pooling, and element-wise activations) that
+    bypass the overhead of compiling custom compute shaders.
+  * An *ML graph* (`VkMLGraphKHR`) abstraction that composes primitive
+    operations into a directed acyclic graph (DAG) for whole-model
+    dispatch.
+  * An *ML session* (`VkMLSessionKHR`) handle that manages transient
+    state, scratch memory, and resource bindings for one or more
+    concurrent graph evaluations.
+
+The extension integrates natively with existing Vulkan paradigms:
+
+  * Tensor objects follow the create/bind/destroy lifecycle of images
+    and buffers.
+  * ML graphs are recorded into standard `VkCommandBuffer` objects and
+    submitted to compute-capable queues via `vkQueueSubmit2`.
+  * Synchronization uses existing pipeline barriers and timeline
+    semaphores -- no new synchronization primitives are introduced.
+  * Feature and property queries follow the `VkPhysicalDeviceFeatures2`
+    / `VkPhysicalDeviceProperties2` pattern.
+
+This extension supersedes vendor-specific proposals including
+`VK_ARM_tensors`, `VK_ARM_data_graph`, and the Qualcomm ML primitives
+proof-of-concept.  It is designed to serve as the cross-vendor KHR
+baseline for ML on Vulkan.
+
+=== Design Goals
+
+  * *Portability*: A single API surface across desktop, mobile, and
+    embedded implementations.
+  * *Performance*: IHV-provided kernels for primitives, eliminating the
+    need for frameworks to ship hand-tuned SPIR-V for each target.
+  * *Interoperability*: Tensor resources are accessible from compute
+    shaders via SPIR-V, enabling hybrid workloads where custom shaders
+    operate alongside opaque ML primitives.
+  * *Composability*: ML graphs compose with existing Vulkan compute and
+    graphics workloads in the same command buffer, enabling tight
+    integration for neural rendering, super-resolution, and inference-
+    in-the-loop scenarios.
+
+
+[[new-enum-constants]]
+== New Enum Constants
+
+Extending `VkStructureType`:
+
+  * `VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR`
+  * `VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_TENSOR_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_FORMAT_PROPERTIES_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR`
+  * `VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR`
+  * `VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR`
+  * `VK_STRUCTURE_TYPE_TENSOR_COPY_KHR`
+
+Extending `VkObjectType`:
+
+  * `VK_OBJECT_TYPE_TENSOR_KHR`
+  * `VK_OBJECT_TYPE_TENSOR_VIEW_KHR`
+  * `VK_OBJECT_TYPE_ML_GRAPH_KHR`
+  * `VK_OBJECT_TYPE_ML_SESSION_KHR`
+
+Extending `VkDescriptorType`:
+
+  * `VK_DESCRIPTOR_TYPE_TENSOR_KHR`
+
+Extending `VkPipelineStageFlagBits2`:
+
+  * `VK_PIPELINE_STAGE_2_ML_GRAPH_BIT_KHR`
+
+Extending `VkAccessFlagBits2`:
+
+  * `VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR`
+  * `VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR`
+
+Extending `VkFormatFeatureFlagBits2`:
+
+  * `VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_KHR`
+  * `VK_FORMAT_FEATURE_2_TENSOR_IMAGE_ALIASING_BIT_KHR`
+
+Extending `VkFormat`:
+
+  * `VK_FORMAT_R8_BOOL`
+  * `VK_FORMAT_R16_BFLOAT_KHR`
+  * `VK_FORMAT_R8_E4M3_KHR`
+  * `VK_FORMAT_R8_E5M2_KHR`
+
+Extending `VkQueueFlagBits`:
+
+  * `VK_QUEUE_ML_BIT_KHR`
+
+=== New Enumerations
+
+  * `VkTensorTilingKHR`
+  * `VkTensorUsageFlagBitsKHR`
+  * `VkMLOperationTypeKHR`
+  * `VkMLActivationFunctionKHR`
+  * `VkMLPaddingModeKHR`
+  * `VkMLTensorLayoutKHR`
+  * `VkMLTensorBindingTypeKHR`
+
+=== New Bitmask Types
+
+  * `VkTensorUsageFlagsKHR`
+  * `VkTensorCreateFlagsKHR`
+  * `VkTensorViewCreateFlagsKHR`
+  * `VkMLGraphCreateFlagsKHR`
+  * `VkMLSessionCreateFlagsKHR`
+
+
+[[new-object-types]]
+== New Object Types
+
+[[VkTensorKHR]]
+=== VkTensorKHR
+
+`VkTensorKHR` is a non-dispatchable handle representing an N-dimensional
+tensor resource.  Tensors are the fundamental data container for ML
+workloads.  A tensor has a format, dimensionality, shape, tiling mode,
+and usage flags.  Tensors may be backed by device memory allocated and
+bound by the application.
+
+[source,c]
+----
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkTensorKHR)
+----
+
+
+[[VkTensorViewKHR]]
+=== VkTensorViewKHR
+
+`VkTensorViewKHR` is a non-dispatchable handle representing a typed view
+into a `VkTensorKHR`.  Tensor views enable format reinterpretation and
+sub-region access without copying data.
+
+[source,c]
+----
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkTensorViewKHR)
+----
+
+
+[[VkMLGraphKHR]]
+=== VkMLGraphKHR
+
+`VkMLGraphKHR` is a non-dispatchable handle representing a compiled
+directed acyclic graph (DAG) of ML primitive operations.  Once created,
+an ML graph is immutable and may be dispatched multiple times across
+command buffers and sessions.
+
+[source,c]
+----
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkMLGraphKHR)
+----
+
+
+[[VkMLSessionKHR]]
+=== VkMLSessionKHR
+
+`VkMLSessionKHR` is a non-dispatchable handle representing an execution
+context for one or more `VkMLGraphKHR` dispatches.  A session owns
+transient scratch memory and intermediate tensor storage required during
+graph evaluation.  Multiple sessions may exist concurrently to support
+batched or pipelined inference.
+
+[source,c]
+----
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkMLSessionKHR)
+----
+
+
+[[feature-queries]]
+== Feature and Property Queries
+
+[[VkPhysicalDeviceMLFeaturesKHR]]
+=== VkPhysicalDeviceMLFeaturesKHR
+
+The `VkPhysicalDeviceMLFeaturesKHR` structure is defined as:
+
+[source,c]
+----
+typedef struct VkPhysicalDeviceMLFeaturesKHR {
+    VkStructureType    sType;
+    void*              pNext;
+    VkBool32           mlPrimitives;
+    VkBool32           mlGraph;
+    VkBool32           tensorObjects;
+    VkBool32           tensorShaderAccess;
+    VkBool32           tensorImageAliasing;
+    VkBool32           fp16Tensors;
+    VkBool32           bf16Tensors;
+    VkBool32           int8Tensors;
+    VkBool32           int4Tensors;
+    VkBool32           fp8Tensors;
+    VkBool32           fusedActivations;
+    VkBool32           mlGraphScratchAutoAllocation;
+} VkPhysicalDeviceMLFeaturesKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `mlPrimitives` indicates whether the implementation supports ML
+    primitive operations (convolution, GEMM, pooling, activations).
+  * `mlGraph` indicates whether the implementation supports construction
+    and dispatch of `VkMLGraphKHR` objects.
+  * `tensorObjects` indicates whether the implementation supports
+    creation of `VkTensorKHR` objects.
+  * `tensorShaderAccess` indicates whether tensors can be accessed from
+    compute shaders via SPIR-V `OpTensorReadKHR`/`OpTensorWriteKHR`.
+  * `tensorImageAliasing` indicates whether tensors and images may alias
+    the same device memory.
+  * `fp16Tensors` indicates support for `VK_FORMAT_R16_SFLOAT` tensors.
+  * `bf16Tensors` indicates support for `VK_FORMAT_R16_BFLOAT_KHR`
+    tensors.
+  * `int8Tensors` indicates support for `VK_FORMAT_R8_SINT` /
+    `VK_FORMAT_R8_UINT` tensors.
+  * `int4Tensors` indicates support for packed 4-bit integer tensors.
+  * `fp8Tensors` indicates support for 8-bit floating-point tensors
+    (E4M3 and E5M2 encodings).
+  * `fusedActivations` indicates whether ML primitives support fused
+    activation functions.
+  * `mlGraphScratchAutoAllocation` indicates whether the implementation
+    can automatically allocate scratch memory for ML graph execution.
+
+This structure *may* be included in the `pNext` chain of
+`VkPhysicalDeviceFeatures2` and `VkDeviceCreateInfo`.
+
+.Valid Usage
+****
+  * [[VUID-VkPhysicalDeviceMLFeaturesKHR-sType-sType]]
+    `sType` *must* be
+    `VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR`
+****
+
+
+[[VkPhysicalDeviceMLPropertiesKHR]]
+=== VkPhysicalDeviceMLPropertiesKHR
+
+The `VkPhysicalDeviceMLPropertiesKHR` structure is defined as:
+
+[source,c]
+----
+typedef struct VkPhysicalDeviceMLPropertiesKHR {
+    VkStructureType    sType;
+    void*              pNext;
+    uint32_t           maxTensorDimensions;
+    uint64_t           maxTensorElements;
+    uint32_t           maxTensorDimensionSize;
+    uint32_t           maxMLGraphNodeCount;
+    uint32_t           maxMLGraphDepth;
+    uint32_t           maxMLSessionCount;
+    uint32_t           maxConcurrentMLDispatches;
+    uint32_t           supportedPrimitiveCount;
+    VkDeviceSize       minTensorMemoryAlignment;
+    VkDeviceSize       maxScratchMemorySize;
+} VkPhysicalDeviceMLPropertiesKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `maxTensorDimensions` is the maximum number of dimensions supported
+    for a single tensor.  *Must* be at least 4.
+  * `maxTensorElements` is the maximum total number of elements in a
+    single tensor.
+  * `maxTensorDimensionSize` is the maximum extent of any single tensor
+    dimension.
+  * `maxMLGraphNodeCount` is the maximum number of nodes in a single
+    `VkMLGraphKHR`.
+  * `maxMLGraphDepth` is the maximum depth of the DAG in a single
+    `VkMLGraphKHR`.
+  * `maxMLSessionCount` is the maximum number of `VkMLSessionKHR`
+    objects that may exist concurrently on a device.
+  * `maxConcurrentMLDispatches` is the maximum number of ML graph
+    dispatches that may execute concurrently.
+  * `supportedPrimitiveCount` is the number of ML primitive types
+    supported by the implementation.
+  * `minTensorMemoryAlignment` is the minimum alignment, in bytes, for
+    tensor memory allocations.
+  * `maxScratchMemorySize` is the maximum amount of scratch memory the
+    implementation may require for any single graph dispatch.
+
+This structure *may* be included in the `pNext` chain of
+`VkPhysicalDeviceProperties2`.
+
+.Valid Usage
+****
+  * [[VUID-VkPhysicalDeviceMLPropertiesKHR-sType-sType]]
+    `sType` *must* be
+    `VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR`
+****
+
+
+[[tensor-objects]]
+== Tensor Objects
+
+[[tensor-description]]
+=== Tensor Description
+
+The `VkTensorDescriptionKHR` structure describes the geometry, format,
+memory layout, and usage of a tensor:
+
+[source,c]
+----
+typedef struct VkTensorDescriptionKHR {
+    VkStructureType          sType;
+    const void*              pNext;
+    VkTensorTilingKHR        tiling;
+    VkFormat                 format;
+    uint32_t                 dimensionCount;
+    const uint32_t*          pDimensions;
+    const VkDeviceSize*      pStrides;
+    VkTensorUsageFlagsKHR    usage;
+} VkTensorDescriptionKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `tiling` specifies the data layout strategy for tensor elements.
+  * `format` is a `VkFormat` describing the type and size of each
+    tensor element.  Only single-component formats are permitted.
+  * `dimensionCount` is the number of dimensions.  *Must* be between 1
+    and `VkPhysicalDeviceMLPropertiesKHR::maxTensorDimensions`
+    inclusive.
+  * `pDimensions` is a pointer to an array of `dimensionCount` values
+    specifying the size of each dimension, ordered from outermost to
+    innermost.
+  * `pStrides` is `NULL` or a pointer to an array of `dimensionCount`
+    values specifying byte strides for each dimension.  If `NULL`, the
+    tensor is densely packed.  *Must* be `NULL` when `tiling` is
+    `VK_TENSOR_TILING_OPTIMAL_KHR`.
+  * `usage` is a bitmask of `VkTensorUsageFlagBitsKHR` describing the
+    intended usage of the tensor.
+
+.Valid Usage
+****
+  * [[VUID-VkTensorDescriptionKHR-dimensionCount-00001]]
+    `dimensionCount` *must* be greater than 0 and less than or equal to
+    `VkPhysicalDeviceMLPropertiesKHR::maxTensorDimensions`
+  * [[VUID-VkTensorDescriptionKHR-pDimensions-00002]]
+    Each element of `pDimensions` *must* be greater than 0 and less than
+    or equal to
+    `VkPhysicalDeviceMLPropertiesKHR::maxTensorDimensionSize`
+  * [[VUID-VkTensorDescriptionKHR-pDimensions-00003]]
+    The product of all elements of `pDimensions` *must* be less than or
+    equal to `VkPhysicalDeviceMLPropertiesKHR::maxTensorElements`
+  * [[VUID-VkTensorDescriptionKHR-pStrides-00004]]
+    If `tiling` is `VK_TENSOR_TILING_OPTIMAL_KHR`, `pStrides` *must*
+    be `NULL`
+  * [[VUID-VkTensorDescriptionKHR-format-00005]]
+    `format` *must* be a single-component format
+  * [[VUID-VkTensorDescriptionKHR-pStrides-00006]]
+    If `pStrides` is not `NULL`, each stride *must* be a multiple of
+    the element size of `format`
+****
+
+
+[[tensor-tiling]]
+=== Tensor Tiling
+
+[source,c]
+----
+typedef enum VkTensorTilingKHR {
+    VK_TENSOR_TILING_OPTIMAL_KHR  = 0,
+    VK_TENSOR_TILING_LINEAR_KHR   = 1,
+} VkTensorTilingKHR;
+----
+
+  * `VK_TENSOR_TILING_OPTIMAL_KHR` -- The implementation selects an
+    opaque, device-optimal data layout.  Applications *must not* assume
+    any particular arrangement of elements in memory.
+  * `VK_TENSOR_TILING_LINEAR_KHR` -- Elements are stored in row-major
+    order with application-specified or densely-packed strides.
+    Applications *may* map and directly access tensor memory.
+
+
+[[tensor-usage-flags]]
+=== Tensor Usage Flags
+
+[source,c]
+----
+typedef enum VkTensorUsageFlagBitsKHR {
+    VK_TENSOR_USAGE_SHADER_BIT_KHR         = 0x00000001,
+    VK_TENSOR_USAGE_TRANSFER_SRC_BIT_KHR   = 0x00000002,
+    VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR   = 0x00000004,
+    VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR = 0x00000008,
+    VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR= 0x00000010,
+    VK_TENSOR_USAGE_ML_GRAPH_WEIGHT_BIT_KHR= 0x00000020,
+    VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR = 0x00000040,
+} VkTensorUsageFlagBitsKHR;
+typedef VkFlags VkTensorUsageFlagsKHR;
+----
+
+  * `VK_TENSOR_USAGE_SHADER_BIT_KHR` -- The tensor *may* be accessed
+    from compute shaders via SPIR-V tensor accessors.
+  * `VK_TENSOR_USAGE_TRANSFER_SRC_BIT_KHR` -- The tensor *may* be used
+    as a source in `vkCmdCopyTensorKHR`.
+  * `VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR` -- The tensor *may* be used
+    as a destination in `vkCmdCopyTensorKHR`.
+  * `VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR` -- The tensor *may* be
+    bound as an input to an ML graph dispatch.
+  * `VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR` -- The tensor *may* be
+    bound as an output of an ML graph dispatch.
+  * `VK_TENSOR_USAGE_ML_GRAPH_WEIGHT_BIT_KHR` -- The tensor *may* be
+    bound as a constant weight/bias parameter of an ML graph.
+  * `VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR` -- The tensor *may* alias
+    device memory with a `VkImage` resource.  Requires the
+    `tensorImageAliasing` feature.
+
+
+[[tensor-create-info]]
+=== Creating Tensors
+
+To create a tensor, call:
+
+[source,c]
+----
+VkResult vkCreateTensorKHR(
+    VkDevice                        device,
+    const VkTensorCreateInfoKHR*    pCreateInfo,
+    const VkAllocationCallbacks*    pAllocator,
+    VkTensorKHR*                    pTensor);
+----
+
+  * `device` is the logical device that creates the tensor.
+  * `pCreateInfo` is a pointer to a `VkTensorCreateInfoKHR` structure
+    describing the tensor to create.
+  * `pAllocator` controls host memory allocation as described in the
+    <<memory-allocation,Memory Allocation>> chapter.
+  * `pTensor` is a pointer to a `VkTensorKHR` handle in which the
+    resulting tensor object is returned.
+
+.Valid Usage
+****
+  * [[VUID-vkCreateTensorKHR-tensorObjects-00001]]
+    The `tensorObjects` feature *must* be enabled
+  * [[VUID-vkCreateTensorKHR-device-00002]]
+    `device` *must* have been created with at least one queue
+****
+
+.Return Codes
+--
+[cols="1,1"]
+|===
+| Success | Failure
+
+| `VK_SUCCESS`
+| `VK_ERROR_OUT_OF_HOST_MEMORY`
+
+|
+| `VK_ERROR_OUT_OF_DEVICE_MEMORY`
+
+|
+| `VK_ERROR_VALIDATION_FAILED`
+|===
+--
+
+The `VkTensorCreateInfoKHR` structure is defined as:
+
+[source,c]
+----
+typedef struct VkTensorCreateInfoKHR {
+    VkStructureType                  sType;
+    const void*                      pNext;
+    VkTensorCreateFlagsKHR           flags;
+    const VkTensorDescriptionKHR*    pDescription;
+    VkSharingMode                    sharingMode;
+    uint32_t                         queueFamilyIndexCount;
+    const uint32_t*                  pQueueFamilyIndices;
+} VkTensorCreateInfoKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `flags` is reserved for future use; *must* be 0.
+  * `pDescription` is a pointer to a `VkTensorDescriptionKHR` describing
+    the tensor geometry, format, and usage.
+  * `sharingMode` specifies the sharing mode when the tensor will be
+    accessed by multiple queue families.
+  * `queueFamilyIndexCount` is the number of entries in
+    `pQueueFamilyIndices`.
+  * `pQueueFamilyIndices` is a pointer to an array of queue family
+    indices that will access this tensor.  Ignored if `sharingMode` is
+    not `VK_SHARING_MODE_CONCURRENT`.
+
+.Valid Usage
+****
+  * [[VUID-VkTensorCreateInfoKHR-sharingMode-00001]]
+    If `sharingMode` is `VK_SHARING_MODE_CONCURRENT`,
+    `queueFamilyIndexCount` *must* be greater than 1
+  * [[VUID-VkTensorCreateInfoKHR-sharingMode-00002]]
+    If `sharingMode` is `VK_SHARING_MODE_CONCURRENT`,
+    `pQueueFamilyIndices` *must* be a valid pointer to an array of
+    `queueFamilyIndexCount` `uint32_t` values, each of which *must*
+    be unique and less than the number of queue families available
+  * [[VUID-VkTensorCreateInfoKHR-pDescription-00003]]
+    `pDescription` *must* be a valid pointer to a valid
+    `VkTensorDescriptionKHR` structure
+****
+
+[source,c]
+----
+typedef VkFlags VkTensorCreateFlagsKHR;
+----
+
+
+[[tensor-memory]]
+=== Tensor Memory Requirements and Binding
+
+Applications query tensor memory requirements using
+`vkGetTensorMemoryRequirementsKHR` and bind allocated memory using
+`vkBindTensorMemoryKHR`.
+
+[source,c]
+----
+void vkGetTensorMemoryRequirementsKHR(
+    VkDevice                                     device,
+    const VkTensorMemoryRequirementsInfoKHR*      pInfo,
+    VkMemoryRequirements2*                        pMemoryRequirements);
+----
+
+  * `device` is the logical device that owns the tensor.
+  * `pInfo` is a pointer to a `VkTensorMemoryRequirementsInfoKHR`
+    structure identifying the tensor.
+  * `pMemoryRequirements` is a pointer to a `VkMemoryRequirements2`
+    structure in which the requirements are returned.
+
+[source,c]
+----
+typedef struct VkTensorMemoryRequirementsInfoKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    VkTensorKHR        tensor;
+} VkTensorMemoryRequirementsInfoKHR;
+----
+
+To bind memory to a tensor:
+
+[source,c]
+----
+VkResult vkBindTensorMemoryKHR(
+    VkDevice                              device,
+    uint32_t                              bindInfoCount,
+    const VkBindTensorMemoryInfoKHR*      pBindInfos);
+----
+
+  * `device` is the logical device that owns the tensors.
+  * `bindInfoCount` is the number of elements in `pBindInfos`.
+  * `pBindInfos` is a pointer to an array of `VkBindTensorMemoryInfoKHR`
+    structures.
+
+[source,c]
+----
+typedef struct VkBindTensorMemoryInfoKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    VkTensorKHR        tensor;
+    VkDeviceMemory     memory;
+    VkDeviceSize       memoryOffset;
+} VkBindTensorMemoryInfoKHR;
+----
+
+.Valid Usage
+****
+  * [[VUID-VkBindTensorMemoryInfoKHR-tensor-00001]]
+    `tensor` *must* not already be bound to memory
+  * [[VUID-VkBindTensorMemoryInfoKHR-memoryOffset-00002]]
+    `memoryOffset` *must* be a multiple of
+    `VkPhysicalDeviceMLPropertiesKHR::minTensorMemoryAlignment`
+  * [[VUID-VkBindTensorMemoryInfoKHR-memory-00003]]
+    `memory` *must* have been allocated with a memory type compatible
+    with the requirements returned by
+    `vkGetTensorMemoryRequirementsKHR` for `tensor`
+  * [[VUID-VkBindTensorMemoryInfoKHR-size-00004]]
+    The size of the memory range starting at `memoryOffset` and ending
+    at the end of `memory` *must* be greater than or equal to the
+    `size` member of `VkMemoryRequirements` returned by
+    `vkGetTensorMemoryRequirementsKHR`
+****
+
+.Return Codes
+--
+[cols="1,1"]
+|===
+| Success | Failure
+
+| `VK_SUCCESS`
+| `VK_ERROR_OUT_OF_HOST_MEMORY`
+
+|
+| `VK_ERROR_OUT_OF_DEVICE_MEMORY`
+|===
+--
+
+
+[[tensor-views]]
+=== Tensor Views
+
+To create a tensor view, call:
+
+[source,c]
+----
+VkResult vkCreateTensorViewKHR(
+    VkDevice                            device,
+    const VkTensorViewCreateInfoKHR*    pCreateInfo,
+    const VkAllocationCallbacks*        pAllocator,
+    VkTensorViewKHR*                    pView);
+----
+
+  * `device` is the logical device that creates the tensor view.
+  * `pCreateInfo` is a pointer to a `VkTensorViewCreateInfoKHR`
+    structure describing the view.
+  * `pAllocator` controls host memory allocation.
+  * `pView` is a pointer to a `VkTensorViewKHR` handle in which the
+    resulting tensor view is returned.
+
+.Valid Usage
+****
+  * [[VUID-vkCreateTensorViewKHR-tensorObjects-00001]]
+    The `tensorObjects` feature *must* be enabled
+  * [[VUID-vkCreateTensorViewKHR-tensor-00002]]
+    The tensor referenced by `pCreateInfo->tensor` *must* have been
+    created on `device` and *must* have memory bound
+****
+
+.Return Codes
+--
+[cols="1,1"]
+|===
+| Success | Failure
+
+| `VK_SUCCESS`
+| `VK_ERROR_OUT_OF_HOST_MEMORY`
+
+|
+| `VK_ERROR_OUT_OF_DEVICE_MEMORY`
+|===
+--
+
+[source,c]
+----
+typedef VkFlags VkTensorViewCreateFlagsKHR;
+----
+
+The `VkTensorViewCreateInfoKHR` structure is defined as:
+
+[source,c]
+----
+typedef struct VkTensorViewCreateInfoKHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkTensorViewCreateFlagsKHR  flags;
+    VkTensorKHR                 tensor;
+    VkFormat                    format;
+    uint32_t                    dimensionCount;
+    const uint32_t*             pDimensionOffsets;
+    const uint32_t*             pDimensionSizes;
+} VkTensorViewCreateInfoKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `flags` is reserved for future use; *must* be 0.
+  * `tensor` is the `VkTensorKHR` on which the view is created.
+  * `format` is the format used to reinterpret tensor elements.  *Must*
+    be compatible with the format of `tensor`.
+  * `dimensionCount` *must* equal the dimension count of `tensor`.
+  * `pDimensionOffsets` is a pointer to an array of `dimensionCount`
+    offsets into each dimension.
+  * `pDimensionSizes` is a pointer to an array of `dimensionCount`
+    sizes for each dimension of the view.
+
+.Valid Usage
+****
+  * [[VUID-VkTensorViewCreateInfoKHR-sType-sType]]
+    `sType` *must* be `VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR`
+  * [[VUID-VkTensorViewCreateInfoKHR-format-00001]]
+    The element size of `format` *must* equal the element size of the
+    tensor's format
+  * [[VUID-VkTensorViewCreateInfoKHR-range-00002]]
+    For each dimension _i_, `pDimensionOffsets[i] + pDimensionSizes[i]`
+    *must* be less than or equal to the corresponding dimension size of
+    `tensor`
+  * [[VUID-VkTensorViewCreateInfoKHR-dimensionCount-00003]]
+    `dimensionCount` *must* equal the `dimensionCount` of the
+    `VkTensorDescriptionKHR` used to create `tensor`
+  * [[VUID-VkTensorViewCreateInfoKHR-tensor-00004]]
+    `tensor` *must* be a valid `VkTensorKHR` handle
+****
+
+
+[[tensor-destroy]]
+=== Destroying Tensors
+
+[source,c]
+----
+void vkDestroyTensorKHR(
+    VkDevice                        device,
+    VkTensorKHR                     tensor,
+    const VkAllocationCallbacks*    pAllocator);
+----
+
+.Valid Usage
+****
+  * [[VUID-vkDestroyTensorKHR-tensor-00001]]
+    All submitted commands that refer to `tensor` *must* have completed
+    execution
+  * [[VUID-vkDestroyTensorKHR-tensor-00002]]
+    All `VkTensorViewKHR` objects created from `tensor` *must* have
+    been destroyed prior to destroying `tensor`
+****
+
+[source,c]
+----
+void vkDestroyTensorViewKHR(
+    VkDevice                        device,
+    VkTensorViewKHR                 view,
+    const VkAllocationCallbacks*    pAllocator);
+----
+
+
+[[tensor-copy]]
+=== Tensor Copy
+
+To copy data between tensors, call:
+
+[source,c]
+----
+void vkCmdCopyTensorKHR(
+    VkCommandBuffer                 commandBuffer,
+    const VkCopyTensorInfoKHR*      pCopyInfo);
+----
+
+  * `commandBuffer` is the command buffer into which the command is
+    recorded.
+  * `pCopyInfo` is a pointer to a `VkCopyTensorInfoKHR` structure
+    describing the copy operation.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdCopyTensorKHR-commandBuffer-00001]]
+    `commandBuffer` *must* be in the recording state
+  * [[VUID-vkCmdCopyTensorKHR-srcTensor-00002]]
+    `pCopyInfo->srcTensor` *must* have been created with
+    `VK_TENSOR_USAGE_TRANSFER_SRC_BIT_KHR`
+  * [[VUID-vkCmdCopyTensorKHR-dstTensor-00003]]
+    `pCopyInfo->dstTensor` *must* have been created with
+    `VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR`
+  * [[VUID-vkCmdCopyTensorKHR-srcTensor-00004]]
+    `pCopyInfo->srcTensor` and `pCopyInfo->dstTensor` *must* have
+    memory bound via `vkBindTensorMemoryKHR`
+  * [[VUID-vkCmdCopyTensorKHR-format-00005]]
+    The format of `srcTensor` and `dstTensor` *must* have equal element
+    sizes
+  * [[VUID-vkCmdCopyTensorKHR-srcTensor-00006]]
+    `srcTensor` and `dstTensor` *must not* be the same `VkTensorKHR`
+    handle
+****
+
+This command *must* only be called outside of a render pass instance.
+
+[source,c]
+----
+typedef struct VkCopyTensorInfoKHR {
+    VkStructureType        sType;
+    const void*            pNext;
+    VkTensorKHR            srcTensor;
+    VkTensorKHR            dstTensor;
+    uint32_t               regionCount;
+    const VkTensorCopyKHR* pRegions;
+} VkCopyTensorInfoKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `srcTensor` is the source tensor.
+  * `dstTensor` is the destination tensor.
+  * `regionCount` is the number of regions to copy.
+  * `pRegions` is a pointer to an array of `regionCount`
+    `VkTensorCopyKHR` structures specifying the regions to copy.
+
+.Valid Usage
+****
+  * [[VUID-VkCopyTensorInfoKHR-regionCount-00001]]
+    `regionCount` *must* be greater than 0
+****
+
+[source,c]
+----
+typedef struct VkTensorCopyKHR {
+    VkStructureType        sType;
+    const void*            pNext;
+    uint32_t               dimensionCount;
+    const uint32_t*        pSrcOffsets;
+    const uint32_t*        pDstOffsets;
+    const uint32_t*        pExtents;
+} VkTensorCopyKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `dimensionCount` is the number of dimensions in the copy region.
+    *Must* equal the dimension count of both the source and destination
+    tensors.
+  * `pSrcOffsets` is a pointer to an array of `dimensionCount` offsets
+    specifying the start position in the source tensor.
+  * `pDstOffsets` is a pointer to an array of `dimensionCount` offsets
+    specifying the start position in the destination tensor.
+  * `pExtents` is a pointer to an array of `dimensionCount` values
+    specifying the size of the region to copy in each dimension.
+
+.Valid Usage
+****
+  * [[VUID-VkTensorCopyKHR-pSrcOffsets-00001]]
+    For each dimension _i_, `pSrcOffsets[i] + pExtents[i]` *must* be
+    less than or equal to the corresponding dimension size of
+    `srcTensor`
+  * [[VUID-VkTensorCopyKHR-pDstOffsets-00002]]
+    For each dimension _i_, `pDstOffsets[i] + pExtents[i]` *must* be
+    less than or equal to the corresponding dimension size of
+    `dstTensor`
+****
+
+
+[[tensor-barriers]]
+=== Tensor Memory Barriers
+
+[source,c]
+----
+typedef struct VkTensorMemoryBarrierKHR {
+    VkStructureType          sType;
+    const void*              pNext;
+    VkAccessFlags2           srcAccessMask;
+    VkAccessFlags2           dstAccessMask;
+    uint32_t                 srcQueueFamilyIndex;
+    uint32_t                 dstQueueFamilyIndex;
+    VkTensorKHR              tensor;
+} VkTensorMemoryBarrierKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `srcAccessMask` is a bitmask of `VkAccessFlagBits2` specifying a
+    <<synchronization-access-masks,source access mask>>.
+  * `dstAccessMask` is a bitmask of `VkAccessFlagBits2` specifying a
+    <<synchronization-access-masks,destination access mask>>.
+  * `srcQueueFamilyIndex` is the source queue family for a
+    <<synchronization-queue-transfers,queue family ownership transfer>>,
+    or `VK_QUEUE_FAMILY_IGNORED`.
+  * `dstQueueFamilyIndex` is the destination queue family for a
+    queue family ownership transfer, or `VK_QUEUE_FAMILY_IGNORED`.
+  * `tensor` is the `VkTensorKHR` affected by this barrier.
+
+The access masks accept the new `VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR`
+and `VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR` flags in addition to all
+existing access flags applicable to compute operations.
+
+To specify one or more tensor memory barriers in a single dependency
+operation, the `VkTensorDependencyInfoKHR` structure *may* be included
+in the `pNext` chain of `VkDependencyInfo`:
+
+[source,c]
+----
+typedef struct VkTensorDependencyInfoKHR {
+    VkStructureType                     sType;
+    const void*                         pNext;
+    uint32_t                            tensorMemoryBarrierCount;
+    const VkTensorMemoryBarrierKHR*     pTensorMemoryBarriers;
+} VkTensorDependencyInfoKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `tensorMemoryBarrierCount` is the number of tensor memory barriers.
+  * `pTensorMemoryBarriers` is a pointer to an array of
+    `tensorMemoryBarrierCount` `VkTensorMemoryBarrierKHR` structures.
+
+If only a single tensor barrier is required, a `VkTensorMemoryBarrierKHR`
+*may* alternatively be chained directly into `VkDependencyInfo::pNext`.
+
+
+[[tensor-descriptors]]
+=== Tensor Descriptors
+
+Tensors are bound to descriptor sets using a new descriptor type
+`VK_DESCRIPTOR_TYPE_TENSOR_KHR`.  Tensor descriptors are written via
+the `VkWriteDescriptorSetTensorKHR` structure chained into
+`VkWriteDescriptorSet::pNext`:
+
+[source,c]
+----
+typedef struct VkWriteDescriptorSetTensorKHR {
+    VkStructureType          sType;
+    const void*              pNext;
+    uint32_t                 tensorCount;
+    const VkTensorViewKHR*   pTensorViews;
+} VkWriteDescriptorSetTensorKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `tensorCount` is the number of tensor views in `pTensorViews`.
+  * `pTensorViews` is a pointer to an array of `tensorCount`
+    `VkTensorViewKHR` handles.
+
+.Valid Usage
+****
+  * [[VUID-VkWriteDescriptorSetTensorKHR-tensorCount-00001]]
+    `tensorCount` *must* be greater than 0
+  * [[VUID-VkWriteDescriptorSetTensorKHR-pTensorViews-00002]]
+    Each element of `pTensorViews` *must* be a valid
+    `VkTensorViewKHR` handle
+****
+
+
+[[tensor-format-properties]]
+=== Tensor Format Properties
+
+To query supported tensor formats, include a `VkTensorFormatPropertiesKHR`
+structure in the `pNext` chain of `VkFormatProperties3` when calling
+`vkGetPhysicalDeviceFormatProperties2`:
+
+[source,c]
+----
+typedef struct VkTensorFormatPropertiesKHR {
+    VkStructureType            sType;
+    void*                      pNext;
+    VkFormatFeatureFlags2      tensorFeatures;
+} VkTensorFormatPropertiesKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `tensorFeatures` is a bitmask of `VkFormatFeatureFlagBits2`
+    describing the features supported for tensors with this format.
+    The flags `VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_KHR` and
+    `VK_FORMAT_FEATURE_2_TENSOR_IMAGE_ALIASING_BIT_KHR` are applicable.
+
+
+[[ml-primitives]]
+== ML Primitive Operations
+
+ML primitives are IHV-optimized fixed-function operations.  Each
+primitive is described by an operation-specific descriptor structure
+that is attached as a node in a `VkMLGraphKHR`.
+
+Implementations *must* support at least the following primitive types
+when the `mlPrimitives` feature is enabled.
+
+[[ml-operation-type]]
+=== VkMLOperationTypeKHR
+
+[source,c]
+----
+typedef enum VkMLOperationTypeKHR {
+    VK_ML_OPERATION_TYPE_CONVOLUTION_2D_KHR         = 0,
+    VK_ML_OPERATION_TYPE_DECONVOLUTION_2D_KHR       = 1,
+    VK_ML_OPERATION_TYPE_GEMM_KHR                   = 2,
+    VK_ML_OPERATION_TYPE_FULLY_CONNECTED_KHR        = 3,
+    VK_ML_OPERATION_TYPE_MAX_POOL_2D_KHR            = 4,
+    VK_ML_OPERATION_TYPE_AVERAGE_POOL_2D_KHR        = 5,
+    VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR    = 6,
+    VK_ML_OPERATION_TYPE_RELU_KHR                   = 7,
+    VK_ML_OPERATION_TYPE_SIGMOID_KHR                = 8,
+    VK_ML_OPERATION_TYPE_TANH_KHR                   = 9,
+    VK_ML_OPERATION_TYPE_LEAKY_RELU_KHR             = 10,
+    VK_ML_OPERATION_TYPE_PRELU_KHR                  = 11,
+    VK_ML_OPERATION_TYPE_SOFTMAX_KHR                = 12,
+    VK_ML_OPERATION_TYPE_BATCH_NORMALIZATION_KHR    = 13,
+    VK_ML_OPERATION_TYPE_LRN_KHR                    = 14,
+    VK_ML_OPERATION_TYPE_ELEMENTWISE_ADD_KHR        = 15,
+    VK_ML_OPERATION_TYPE_ELEMENTWISE_MUL_KHR        = 16,
+    VK_ML_OPERATION_TYPE_CONCAT_KHR                 = 17,
+    VK_ML_OPERATION_TYPE_RESHAPE_KHR                = 18,
+    VK_ML_OPERATION_TYPE_TRANSPOSE_KHR              = 19,
+    VK_ML_OPERATION_TYPE_RESIZE_KHR                 = 20,
+} VkMLOperationTypeKHR;
+----
+
+[[activation-function-type]]
+=== VkMLActivationFunctionKHR
+
+[source,c]
+----
+typedef enum VkMLActivationFunctionKHR {
+    VK_ML_ACTIVATION_FUNCTION_NONE_KHR       = 0,
+    VK_ML_ACTIVATION_FUNCTION_RELU_KHR       = 1,
+    VK_ML_ACTIVATION_FUNCTION_SIGMOID_KHR    = 2,
+    VK_ML_ACTIVATION_FUNCTION_TANH_KHR       = 3,
+    VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR = 4,
+    VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR      = 5,
+} VkMLActivationFunctionKHR;
+----
+
+
+[[padding-mode]]
+=== VkMLPaddingModeKHR
+
+[source,c]
+----
+typedef enum VkMLPaddingModeKHR {
+    VK_ML_PADDING_MODE_VALID_KHR  = 0,
+    VK_ML_PADDING_MODE_SAME_KHR   = 1,
+    VK_ML_PADDING_MODE_EXPLICIT_KHR = 2,
+} VkMLPaddingModeKHR;
+----
+
+
+[[data-layout]]
+=== VkMLTensorLayoutKHR
+
+[source,c]
+----
+typedef enum VkMLTensorLayoutKHR {
+    VK_ML_TENSOR_LAYOUT_NCHW_KHR = 0,
+    VK_ML_TENSOR_LAYOUT_NHWC_KHR = 1,
+    VK_ML_TENSOR_LAYOUT_NDHWC_KHR = 2,
+} VkMLTensorLayoutKHR;
+----
+
+
+[[convolution-desc]]
+=== Convolution Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescConvolutionKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLTensorLayoutKHR          inputLayout;
+    uint32_t                     kernelWidth;
+    uint32_t                     kernelHeight;
+    uint32_t                     strideX;
+    uint32_t                     strideY;
+    uint32_t                     dilationX;
+    uint32_t                     dilationY;
+    VkMLPaddingModeKHR           paddingMode;
+    uint32_t                     paddingTop;
+    uint32_t                     paddingBottom;
+    uint32_t                     paddingLeft;
+    uint32_t                     paddingRight;
+    uint32_t                     groupCount;
+    VkMLActivationFunctionKHR    fusedActivation;
+    float                        activationParam0;
+    float                        activationParam1;
+} VkMLPrimitiveDescConvolutionKHR;
+----
+
+  * `inputLayout` specifies the logical ordering of tensor dimensions.
+  * `kernelWidth`, `kernelHeight` specify the spatial extent of the
+    convolution filter.
+  * `strideX`, `strideY` specify the stride of the convolution window.
+    *Must* be at least 1.
+  * `dilationX`, `dilationY` specify the dilation factor.  *Must* be at
+    least 1.
+  * `paddingMode` specifies how input is padded.  When
+    `VK_ML_PADDING_MODE_EXPLICIT_KHR`, the four padding fields are used.
+  * `groupCount` is the number of convolution groups.  A value of 1
+    implies standard convolution.  A value equal to the input channel
+    count implies depthwise convolution.
+  * `fusedActivation` specifies an optional activation applied to the
+    output.  Requires `fusedActivations` feature.
+  * `activationParam0`, `activationParam1` are parameters for the fused
+    activation (e.g., alpha for Leaky ReLU, min/max for Clamp).
+
+.Valid Usage
+****
+  * [[VUID-VkMLPrimitiveDescConvolutionKHR-strideX-00001]]
+    `strideX` and `strideY` *must* be greater than 0
+  * [[VUID-VkMLPrimitiveDescConvolutionKHR-dilationX-00002]]
+    `dilationX` and `dilationY` *must* be greater than 0
+  * [[VUID-VkMLPrimitiveDescConvolutionKHR-paddingMode-00003]]
+    If `paddingMode` is not `VK_ML_PADDING_MODE_EXPLICIT_KHR`, the
+    padding fields *must* be 0
+  * [[VUID-VkMLPrimitiveDescConvolutionKHR-fusedActivation-00004]]
+    If `fusedActivation` is not `VK_ML_ACTIVATION_FUNCTION_NONE_KHR`,
+    the `fusedActivations` feature *must* be enabled
+  * [[VUID-VkMLPrimitiveDescConvolutionKHR-groupCount-00005]]
+    `groupCount` *must* evenly divide the input channel dimension
+****
+
+
+[[gemm-desc]]
+=== GEMM Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescGemmKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkBool32                     transposeA;
+    VkBool32                     transposeB;
+    float                        alpha;
+    float                        beta;
+    VkMLActivationFunctionKHR    fusedActivation;
+    float                        activationParam0;
+    float                        activationParam1;
+} VkMLPrimitiveDescGemmKHR;
+----
+
+Computes `D = alpha * op(A) * op(B) + beta * C`, where `op(X)` is `X`
+or `X^T` depending on the transpose flags.
+
+.Valid Usage
+****
+  * [[VUID-VkMLPrimitiveDescGemmKHR-alpha-00001]]
+    `alpha` *must* be a finite floating-point value
+  * [[VUID-VkMLPrimitiveDescGemmKHR-beta-00002]]
+    `beta` *must* be a finite floating-point value
+  * [[VUID-VkMLPrimitiveDescGemmKHR-transposeA-00003]]
+    The inner dimensions of the input matrices after applying transpose
+    operations *must* be equal: if `transposeA` is `VK_TRUE`, the row
+    count of A *must* equal the column count (or row count if
+    `transposeB` is `VK_TRUE`) of B; otherwise, the column count of A
+    *must* equal the row count (or column count if `transposeB` is
+    `VK_TRUE`) of B
+  * [[VUID-VkMLPrimitiveDescGemmKHR-fusedActivation-00004]]
+    If `fusedActivation` is not `VK_ML_ACTIVATION_FUNCTION_NONE_KHR`,
+    the `fusedActivations` feature *must* be enabled
+  * [[VUID-VkMLPrimitiveDescGemmKHR-beta-00005]]
+    If `beta` is not 0.0, a bias tensor C *must* be provided with
+    dimensions compatible with the output
+****
+
+
+[[pooling-desc]]
+=== Pooling Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescPoolingKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLOperationTypeKHR         poolType;
+    VkMLTensorLayoutKHR          inputLayout;
+    uint32_t                     windowWidth;
+    uint32_t                     windowHeight;
+    uint32_t                     strideX;
+    uint32_t                     strideY;
+    VkMLPaddingModeKHR           paddingMode;
+    uint32_t                     paddingTop;
+    uint32_t                     paddingBottom;
+    uint32_t                     paddingLeft;
+    uint32_t                     paddingRight;
+} VkMLPrimitiveDescPoolingKHR;
+----
+
+  * `poolType` *must* be one of `VK_ML_OPERATION_TYPE_MAX_POOL_2D_KHR`,
+    `VK_ML_OPERATION_TYPE_AVERAGE_POOL_2D_KHR`, or
+    `VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`.
+
+.Valid Usage
+****
+  * [[VUID-VkMLPrimitiveDescPoolingKHR-windowWidth-00001]]
+    `windowWidth` and `windowHeight` *must* be greater than 0
+  * [[VUID-VkMLPrimitiveDescPoolingKHR-strideX-00002]]
+    `strideX` and `strideY` *must* be greater than 0
+  * [[VUID-VkMLPrimitiveDescPoolingKHR-poolType-00003]]
+    `poolType` *must* be a pooling operation type
+****
+
+
+[[activation-desc]]
+=== Activation Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescActivationKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLActivationFunctionKHR    activationType;
+    float                        param0;
+    float                        param1;
+} VkMLPrimitiveDescActivationKHR;
+----
+
+Used for standalone (unfused) activation layers.  The semantics are:
+
+  * `VK_ML_ACTIVATION_FUNCTION_RELU_KHR`: `f(x) = max(0, x)`
+  * `VK_ML_ACTIVATION_FUNCTION_SIGMOID_KHR`: `f(x) = 1 / (1 + exp(-x))`
+  * `VK_ML_ACTIVATION_FUNCTION_TANH_KHR`: `f(x) = tanh(x)`
+  * `VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR`: `f(x) = x > 0 ? x : param0 * x`
+  * `VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR`: `f(x) = clamp(x, param0, param1)`
+
+
+[[normalization-desc]]
+=== Normalization Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescNormalizationKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLOperationTypeKHR         normType;
+    float                        epsilon;
+    VkMLTensorLayoutKHR          inputLayout;
+    VkMLActivationFunctionKHR    fusedActivation;
+    float                        activationParam0;
+    float                        activationParam1;
+} VkMLPrimitiveDescNormalizationKHR;
+----
+
+  * `normType` *must* be `VK_ML_OPERATION_TYPE_BATCH_NORMALIZATION_KHR`
+    or `VK_ML_OPERATION_TYPE_LRN_KHR`.
+  * `epsilon` is added to the variance to avoid division by zero.
+
+.Valid Usage
+****
+  * [[VUID-VkMLPrimitiveDescNormalizationKHR-epsilon-00001]]
+    `epsilon` *must* be greater than 0
+  * [[VUID-VkMLPrimitiveDescNormalizationKHR-normType-00002]]
+    `normType` *must* be
+    `VK_ML_OPERATION_TYPE_BATCH_NORMALIZATION_KHR` or
+    `VK_ML_OPERATION_TYPE_LRN_KHR`
+  * [[VUID-VkMLPrimitiveDescNormalizationKHR-fusedActivation-00003]]
+    If `fusedActivation` is not `VK_ML_ACTIVATION_FUNCTION_NONE_KHR`,
+    the `fusedActivations` feature *must* be enabled
+****
+
+
+[[elementwise-desc]]
+=== Elementwise Descriptor
+
+[source,c]
+----
+typedef struct VkMLPrimitiveDescElementwiseKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLOperationTypeKHR         opType;
+    VkMLActivationFunctionKHR    fusedActivation;
+    float                        activationParam0;
+    float                        activationParam1;
+} VkMLPrimitiveDescElementwiseKHR;
+----
+
+  * `opType` *must* be `VK_ML_OPERATION_TYPE_ELEMENTWISE_ADD_KHR` or
+    `VK_ML_OPERATION_TYPE_ELEMENTWISE_MUL_KHR`.
+
+.Valid Usage
+****
+  * [[VUID-VkMLPrimitiveDescElementwiseKHR-opType-00001]]
+    `opType` *must* be `VK_ML_OPERATION_TYPE_ELEMENTWISE_ADD_KHR` or
+    `VK_ML_OPERATION_TYPE_ELEMENTWISE_MUL_KHR`
+  * [[VUID-VkMLPrimitiveDescElementwiseKHR-fusedActivation-00002]]
+    If `fusedActivation` is not `VK_ML_ACTIVATION_FUNCTION_NONE_KHR`,
+    the `fusedActivations` feature *must* be enabled
+****
+
+
+[[ml-graph]]
+== ML Graph
+
+An ML graph encapsulates a directed acyclic graph of ML primitive
+operations compiled for efficient execution on the target device.
+Graph compilation is a potentially expensive operation; applications
+*should* create graphs at initialization time and reuse them.
+
+
+[[ml-graph-node]]
+=== Graph Node Specification
+
+[source,c]
+----
+typedef struct VkMLGraphNodeCreateInfoKHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkMLOperationTypeKHR        operationType;
+    const void*                 pOperationDesc;
+    uint32_t                    inputCount;
+    const VkMLTensorBindingKHR* pInputs;
+    uint32_t                    outputCount;
+    const VkMLTensorBindingKHR* pOutputs;
+    const char*                 pNodeName;
+} VkMLGraphNodeCreateInfoKHR;
+----
+
+  * `operationType` identifies the ML operation performed by this node.
+  * `pOperationDesc` is a pointer to an operation-specific descriptor
+    structure (e.g., `VkMLPrimitiveDescConvolutionKHR`).  The `sType`
+    of the pointed-to structure *must* correspond to `operationType`.
+  * `inputCount` is the number of input tensor bindings.
+  * `pInputs` is a pointer to an array of `VkMLTensorBindingKHR`
+    structures describing input tensors.
+  * `outputCount` is the number of output tensor bindings.
+  * `pOutputs` is a pointer to an array of `VkMLTensorBindingKHR`
+    structures describing output tensors.
+  * `pNodeName` is an optional null-terminated UTF-8 string providing a
+    debug label.  *May* be `NULL`.
+
+[source,c]
+----
+typedef enum VkMLTensorBindingTypeKHR {
+    VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR        = 0,
+    VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_INPUT_KHR  = 1,
+    VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR = 2,
+    VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR = 3,
+} VkMLTensorBindingTypeKHR;
+----
+
+  * `VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR` -- The tensor is produced
+    by another node in the same graph.  `nodeIndex` identifies the
+    producing node.
+  * `VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_INPUT_KHR` -- The tensor
+    is provided externally as a graph input.  `tensorIndex` indexes
+    into `VkMLGraphCreateInfoKHR::pExternalInputDescriptions`.
+  * `VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR` -- The tensor
+    is written externally as a graph output.  `tensorIndex` indexes
+    into `VkMLGraphCreateInfoKHR::pExternalOutputDescriptions`.
+  * `VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR` -- The tensor
+    is provided externally as a constant weight.  `tensorIndex` indexes
+    into `VkMLGraphCreateInfoKHR::pConstantWeightDescriptions`.
+
+[source,c]
+----
+typedef struct VkMLTensorBindingKHR {
+    VkStructureType                sType;
+    const void*                    pNext;
+    VkMLTensorBindingTypeKHR       bindingType;
+    uint32_t                       nodeIndex;
+    uint32_t                       tensorIndex;
+    const VkTensorDescriptionKHR*  pTensorDescription;
+} VkMLTensorBindingKHR;
+----
+
+  * `sType` is a `VkStructureType` value identifying this structure.
+  * `pNext` is `NULL` or a pointer to a structure extending this
+    structure.
+  * `bindingType` specifies whether this tensor is an internal graph
+    edge or an externally-provided input, output, or weight.
+  * `nodeIndex` identifies the producing node when `bindingType` is
+    `VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR`.  Ignored for external
+    binding types.
+  * `tensorIndex` is the index of the tensor within the producing node's
+    output list (for internal bindings), or the index into the
+    corresponding external tensor description array (for external
+    bindings).
+  * `pTensorDescription` describes the tensor geometry and format.
+    *Must* be consistent with the description at the referenced
+    location.
+
+
+[[ml-graph-create]]
+=== Creating an ML Graph
+
+[source,c]
+----
+VkResult vkCreateMLGraphKHR(
+    VkDevice                         device,
+    const VkMLGraphCreateInfoKHR*    pCreateInfo,
+    const VkAllocationCallbacks*     pAllocator,
+    VkMLGraphKHR*                    pGraph);
+----
+
+[source,c]
+----
+typedef struct VkMLGraphCreateInfoKHR {
+    VkStructureType                      sType;
+    const void*                          pNext;
+    VkMLGraphCreateFlagsKHR              flags;
+    uint32_t                             nodeCount;
+    const VkMLGraphNodeCreateInfoKHR*    pNodes;
+    uint32_t                             externalInputCount;
+    const VkTensorDescriptionKHR*        pExternalInputDescriptions;
+    uint32_t                             externalOutputCount;
+    const VkTensorDescriptionKHR*        pExternalOutputDescriptions;
+    uint32_t                             constantWeightCount;
+    const VkTensorDescriptionKHR*        pConstantWeightDescriptions;
+} VkMLGraphCreateInfoKHR;
+----
+
+  * `flags` is reserved; *must* be 0.
+  * `nodeCount` is the number of nodes in the graph.
+  * `pNodes` is a pointer to an array of `VkMLGraphNodeCreateInfoKHR`
+    structures defining each node.
+  * `externalInputCount` is the number of externally-provided input
+    tensors.
+  * `pExternalInputDescriptions` describes the shape and format of each
+    external input.
+  * `externalOutputCount` is the number of output tensors produced by
+    the graph.
+  * `pExternalOutputDescriptions` describes each output.
+  * `constantWeightCount` is the number of constant weight/bias tensors.
+  * `pConstantWeightDescriptions` describes each weight tensor.
+
+.Valid Usage
+****
+  * [[VUID-VkMLGraphCreateInfoKHR-mlGraph-00001]]
+    The `mlGraph` feature *must* be enabled
+  * [[VUID-VkMLGraphCreateInfoKHR-nodeCount-00002]]
+    `nodeCount` *must* be greater than 0 and less than or equal to
+    `VkPhysicalDeviceMLPropertiesKHR::maxMLGraphNodeCount`
+  * [[VUID-VkMLGraphCreateInfoKHR-pNodes-00003]]
+    The graph defined by `pNodes` *must* be a directed acyclic graph
+  * [[VUID-VkMLGraphCreateInfoKHR-pNodes-00004]]
+    All internal tensor edges *must* have compatible shapes and formats
+    between producing and consuming nodes
+  * [[VUID-VkMLGraphCreateInfoKHR-externalInputCount-00005]]
+    `externalInputCount` *must* be greater than 0
+  * [[VUID-VkMLGraphCreateInfoKHR-externalOutputCount-00006]]
+    `externalOutputCount` *must* be greater than 0
+****
+
+[source,c]
+----
+typedef VkFlags VkMLGraphCreateFlagsKHR;
+----
+
+.Return Codes
+--
+[cols="1,1"]
+|===
+| Success | Failure
+
+| `VK_SUCCESS`
+| `VK_ERROR_OUT_OF_HOST_MEMORY`
+
+|
+| `VK_ERROR_OUT_OF_DEVICE_MEMORY`
+
+|
+| `VK_ERROR_INITIALIZATION_FAILED`
+|===
+--
+
+
+[[ml-graph-destroy]]
+=== Destroying an ML Graph
+
+[source,c]
+----
+void vkDestroyMLGraphKHR(
+    VkDevice                        device,
+    VkMLGraphKHR                    graph,
+    const VkAllocationCallbacks*    pAllocator);
+----
+
+.Valid Usage
+****
+  * [[VUID-vkDestroyMLGraphKHR-graph-00001]]
+    All submitted commands that reference `graph` *must* have completed
+    execution
+  * [[VUID-vkDestroyMLGraphKHR-graph-00002]]
+    All `VkMLSessionKHR` objects referencing `graph` *must* have been
+    destroyed
+****
+
+
+[[ml-graph-scratch]]
+=== Querying Scratch Memory Requirements
+
+[source,c]
+----
+void vkGetMLGraphMemoryRequirementsKHR(
+    VkDevice                         device,
+    VkMLGraphKHR                     graph,
+    VkMemoryRequirements2*           pMemoryRequirements);
+----
+
+Returns the scratch memory requirements for executing `graph`.  If the
+`mlGraphScratchAutoAllocation` feature is enabled and no scratch memory
+is provided at dispatch time, the implementation *may* allocate scratch
+memory internally.  Otherwise, the application *must* allocate and bind
+scratch memory via the session.
+
+
+[[ml-session]]
+== ML Session
+
+[[ml-session-create]]
+=== Creating a Session
+
+[source,c]
+----
+VkResult vkCreateMLSessionKHR(
+    VkDevice                           device,
+    const VkMLSessionCreateInfoKHR*    pCreateInfo,
+    const VkAllocationCallbacks*       pAllocator,
+    VkMLSessionKHR*                    pSession);
+----
+
+[source,c]
+----
+typedef struct VkMLSessionCreateInfoKHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkMLSessionCreateFlagsKHR    flags;
+    VkMLGraphKHR                 graph;
+    VkDeviceMemory               scratchMemory;
+    VkDeviceSize                 scratchMemoryOffset;
+    VkDeviceSize                 scratchMemorySize;
+} VkMLSessionCreateInfoKHR;
+----
+
+  * `flags` is reserved; *must* be 0.
+  * `graph` is the ML graph this session will execute.
+  * `scratchMemory` is the device memory allocation used for transient
+    intermediate results.  *May* be `VK_NULL_HANDLE` if
+    `mlGraphScratchAutoAllocation` is enabled.
+  * `scratchMemoryOffset` is the byte offset within `scratchMemory`.
+  * `scratchMemorySize` is the size, in bytes, of the scratch region.
+
+.Valid Usage
+****
+  * [[VUID-VkMLSessionCreateInfoKHR-scratchMemory-00001]]
+    If `scratchMemory` is not `VK_NULL_HANDLE`, `scratchMemorySize`
+    *must* be greater than or equal to the `size` member of
+    `VkMemoryRequirements` returned by
+    `vkGetMLGraphMemoryRequirementsKHR` for `graph`
+  * [[VUID-VkMLSessionCreateInfoKHR-scratchMemory-00002]]
+    If `scratchMemory` is `VK_NULL_HANDLE`, the
+    `mlGraphScratchAutoAllocation` feature *must* be enabled
+  * [[VUID-VkMLSessionCreateInfoKHR-graph-00003]]
+    `graph` *must* be a valid `VkMLGraphKHR` handle created on `device`
+****
+
+[source,c]
+----
+typedef VkFlags VkMLSessionCreateFlagsKHR;
+----
+
+.Return Codes
+--
+[cols="1,1"]
+|===
+| Success | Failure
+
+| `VK_SUCCESS`
+| `VK_ERROR_OUT_OF_HOST_MEMORY`
+
+|
+| `VK_ERROR_OUT_OF_DEVICE_MEMORY`
+|===
+--
+
+
+[[ml-session-destroy]]
+=== Destroying a Session
+
+[source,c]
+----
+void vkDestroyMLSessionKHR(
+    VkDevice                        device,
+    VkMLSessionKHR                  session,
+    const VkAllocationCallbacks*    pAllocator);
+----
+
+.Valid Usage
+****
+  * [[VUID-vkDestroyMLSessionKHR-session-00001]]
+    All submitted commands referencing `session` *must* have completed
+    execution
+****
+
+
+[[ml-dispatch]]
+== ML Graph Dispatch
+
+[[cmd-dispatch]]
+=== vkCmdDispatchMLGraphKHR
+
+To dispatch an ML graph for execution, call:
+
+[source,c]
+----
+void vkCmdDispatchMLGraphKHR(
+    VkCommandBuffer                     commandBuffer,
+    const VkMLGraphDispatchInfoKHR*     pDispatchInfo);
+----
+
+  * `commandBuffer` is the command buffer into which the command is
+    recorded.
+  * `pDispatchInfo` is a pointer to a `VkMLGraphDispatchInfoKHR`
+    structure describing the dispatch.
+
+[source,c]
+----
+typedef struct VkMLGraphDispatchInfoKHR {
+    VkStructureType          sType;
+    const void*              pNext;
+    VkMLSessionKHR           session;
+    uint32_t                 inputTensorCount;
+    const VkTensorKHR*       pInputTensors;
+    uint32_t                 outputTensorCount;
+    const VkTensorKHR*       pOutputTensors;
+    uint32_t                 weightTensorCount;
+    const VkTensorKHR*       pWeightTensors;
+} VkMLGraphDispatchInfoKHR;
+----
+
+  * `session` is the `VkMLSessionKHR` that manages execution state.
+  * `inputTensorCount` *must* equal
+    `VkMLGraphCreateInfoKHR::externalInputCount` of the graph
+    associated with `session`.
+  * `pInputTensors` is a pointer to an array of `VkTensorKHR` handles
+    providing input data.
+  * `outputTensorCount` *must* equal
+    `VkMLGraphCreateInfoKHR::externalOutputCount`.
+  * `pOutputTensors` is a pointer to an array of `VkTensorKHR` handles
+    receiving output data.
+  * `weightTensorCount` *must* equal
+    `VkMLGraphCreateInfoKHR::constantWeightCount`.
+  * `pWeightTensors` is a pointer to an array of `VkTensorKHR` handles
+    providing constant weights.
+
+.Valid Usage
+****
+  * [[VUID-vkCmdDispatchMLGraphKHR-commandBuffer-00001]]
+    `commandBuffer` *must* be in the recording state
+  * [[VUID-vkCmdDispatchMLGraphKHR-commandBuffer-00002]]
+    The `VkCommandPool` that `commandBuffer` was allocated from *must*
+    support compute operations
+  * [[VUID-vkCmdDispatchMLGraphKHR-session-00003]]
+    `session` *must* be a valid `VkMLSessionKHR` handle
+  * [[VUID-vkCmdDispatchMLGraphKHR-inputTensorCount-00004]]
+    `inputTensorCount` *must* be equal to the `externalInputCount`
+    specified when creating the graph associated with `session`
+  * [[VUID-vkCmdDispatchMLGraphKHR-outputTensorCount-00005]]
+    `outputTensorCount` *must* be equal to the `externalOutputCount`
+    specified when creating the graph associated with `session`
+  * [[VUID-vkCmdDispatchMLGraphKHR-weightTensorCount-00006]]
+    `weightTensorCount` *must* be equal to the `constantWeightCount`
+    specified when creating the graph associated with `session`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pInputTensors-00007]]
+    Each tensor in `pInputTensors` *must* have been created with
+    `VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pOutputTensors-00008]]
+    Each tensor in `pOutputTensors` *must* have been created with
+    `VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pWeightTensors-00009]]
+    Each tensor in `pWeightTensors` *must* have been created with
+    `VK_TENSOR_USAGE_ML_GRAPH_WEIGHT_BIT_KHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pInputTensors-00010]]
+    Each tensor in `pInputTensors` *must* have memory bound via
+    `vkBindTensorMemoryKHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pOutputTensors-00011]]
+    Each tensor in `pOutputTensors` *must* have memory bound via
+    `vkBindTensorMemoryKHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-pWeightTensors-00012]]
+    Each tensor in `pWeightTensors` *must* have memory bound via
+    `vkBindTensorMemoryKHR`
+  * [[VUID-vkCmdDispatchMLGraphKHR-shapes-00013]]
+    The shape and format of each input tensor *must* match the
+    corresponding `pExternalInputDescriptions` entry of the graph
+  * [[VUID-vkCmdDispatchMLGraphKHR-shapes-00014]]
+    The shape and format of each output tensor *must* match the
+    corresponding `pExternalOutputDescriptions` entry of the graph
+****
+
+This command *must* only be called outside of a render pass instance.
+
+
+[[execution-model]]
+== Execution and Synchronization Model
+
+=== Queue Requirements
+
+ML graph dispatches are submitted to queues that support the
+`VK_QUEUE_COMPUTE_BIT` capability.  Implementations *may* additionally
+report a dedicated `VK_QUEUE_ML_BIT_KHR` queue family flag (value TBD)
+to indicate hardware queues with dedicated ML acceleration resources.
+
+When a queue family reports `VK_QUEUE_ML_BIT_KHR`, dispatching ML
+graphs to that queue *may* achieve higher throughput or lower latency
+than dispatching to a general-purpose compute queue.
+
+=== Pipeline Stage
+
+The new pipeline stage `VK_PIPELINE_STAGE_2_ML_GRAPH_BIT_KHR`
+represents the execution of ML graph dispatches.  This stage is
+logically positioned after `VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT`
+in the pipeline ordering.
+
+=== Synchronization
+
+ML graph dispatches follow existing Vulkan synchronization rules.
+Applications use pipeline barriers and/or timeline semaphores to order
+ML dispatches with respect to other commands.
+
+==== Intra-command-buffer Dependencies
+
+To ensure that an ML graph dispatch completes before a subsequent
+compute shader reads an output tensor:
+
+[source,c]
+----
+VkTensorMemoryBarrierKHR tensorBarrier = {
+    .sType               = VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+    .pNext               = NULL,
+    .srcAccessMask       = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+    .dstAccessMask       = VK_ACCESS_2_SHADER_READ_BIT,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .tensor              = outputTensor,
+};
+
+VkTensorDependencyInfoKHR tensorDepInfo = {
+    .sType                    = VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR,
+    .pNext                    = NULL,
+    .tensorMemoryBarrierCount = 1,
+    .pTensorMemoryBarriers    = &tensorBarrier,
+};
+
+VkDependencyInfo depInfo = {
+    .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .pNext                    = &tensorDepInfo,
+    .dependencyFlags          = 0,
+    .memoryBarrierCount       = 0,
+    .pMemoryBarriers          = NULL,
+    .bufferMemoryBarrierCount = 0,
+    .pBufferMemoryBarriers    = NULL,
+    .imageMemoryBarrierCount  = 0,
+    .pImageMemoryBarriers     = NULL,
+};
+
+vkCmdPipelineBarrier2(commandBuffer, &depInfo);
+----
+
+The `VkTensorDependencyInfoKHR` is chained into `VkDependencyInfo::pNext`
+to supply tensor-specific barriers alongside the existing buffer and
+image barrier arrays.
+
+==== Cross-queue Synchronization
+
+When ML graphs execute on a dedicated ML queue and results are consumed
+on a graphics or compute queue, a timeline semaphore *must* be used:
+
+[source,c]
+----
+VkSemaphoreSubmitInfo mlSignal = {
+    .sType      = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+    .semaphore  = timelineSemaphore,
+    .value      = mlCompleteValue,
+    .stageMask  = VK_PIPELINE_STAGE_2_ML_GRAPH_BIT_KHR,
+};
+// Signal after ML dispatch on ML queue
+
+VkSemaphoreSubmitInfo computeWait = {
+    .sType      = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+    .semaphore  = timelineSemaphore,
+    .value      = mlCompleteValue,
+    .stageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+};
+// Wait before compute dispatch on compute queue
+----
+
+==== Tensor Queue Family Ownership Transfer
+
+When a tensor is accessed by multiple queue families with
+`VK_SHARING_MODE_EXCLUSIVE`, a queue family ownership transfer *must*
+be performed using paired `VkTensorMemoryBarrierKHR` operations with
+appropriate `srcQueueFamilyIndex` and `dstQueueFamilyIndex`.
+
+=== Implicit Ordering Guarantees
+
+Within a single `vkCmdDispatchMLGraphKHR` invocation, the implementation
+*must* respect all data dependencies defined by the edges of the ML
+graph.  No explicit synchronization is required between nodes of the
+same graph dispatch.
+
+Multiple `vkCmdDispatchMLGraphKHR` calls within the same command buffer
+are *not* implicitly ordered; a pipeline barrier *must* be inserted if
+the output of one dispatch is consumed as input to a subsequent dispatch.
+
+
+[[spirv-environment]]
+== SPIR-V Environment
+
+This extension depends on the `SPV_KHR_tensor` SPIR-V extension and
+introduces the following new capabilities, types, and instructions.
+
+=== Capabilities
+
+[cols="1,1,2"]
+|===
+| Capability | Value | Enabling Feature
+
+| *TensorKHR*
+| TBD
+| `tensorObjects`
+
+| *TensorShaderAccessKHR*
+| TBD
+| `tensorShaderAccess`
+|===
+
+=== Type System
+
+[source,spirv]
+----
+OpTypeTensorKHR %result_type %element_type %rank [%dim0 %dim1 ...]
+----
+
+  * `%element_type` *must* be a scalar type (`OpTypeFloat` or
+    `OpTypeInt`).
+  * `%rank` is an `OpConstant` of type `OpTypeInt 32 0` specifying the
+    number of dimensions.  *May* be omitted for dynamically-ranked
+    tensors.
+  * `%dimN` are optional `OpConstant` values of type `OpTypeInt 32 0`
+    specifying the static size of each dimension.  When omitted, the
+    dimension size is dynamic and queried at runtime.
+
+=== Accessor Instructions
+
+==== OpTensorReadKHR
+
+[source,spirv]
+----
+%result = OpTensorReadKHR %result_type %tensor %coordinates %tensor_operands
+----
+
+  * `%tensor` *must* be a variable of `OpTypeTensorKHR` type.
+  * `%coordinates` *must* be an array of `OpTypeInt 32 0` with length
+    equal to the rank of `%tensor`.
+  * `%tensor_operands` is a literal bitmask (default `None`).
+  * `%result_type` *must* match `%element_type` of `%tensor`, or be an
+    array thereof when reading along the innermost dimension.
+
+==== OpTensorWriteKHR
+
+[source,spirv]
+----
+OpTensorWriteKHR %tensor %coordinates %data %tensor_operands
+----
+
+  * `%tensor` *must* be a variable of `OpTypeTensorKHR` type.
+  * `%coordinates` *must* be an array of `OpTypeInt 32 0` with length
+    equal to the rank of `%tensor`.
+  * `%data` *must* match `%element_type` of `%tensor`, or be an array
+    thereof.
+  * `%tensor_operands` is a literal bitmask (default `None`).
+
+==== OpTensorQuerySizeKHR
+
+[source,spirv]
+----
+%result = OpTensorQuerySizeKHR %result_type %tensor %dimension
+----
+
+  * `%result_type` *must* be `OpTypeInt 32 0`.
+  * `%dimension` is the zero-based dimension index to query.
+
+=== Tensor Operands
+
+[cols="1,1,2"]
+|===
+| Operand | Value | Description
+
+| *None*
+| 0x0
+| No special behavior.
+
+| *Volatile*
+| 0x1
+| Access is volatile; cannot be eliminated or reordered.
+
+| *Aligned*
+| 0x2
+| Followed by a literal integer specifying the alignment in bytes.
+
+| *Nontemporal*
+| 0x4
+| Hint that the data will not be reused.
+
+| *OutOfBoundsZero*
+| 0x8
+| Out-of-bounds reads return zero; out-of-bounds writes are discarded.
+|===
+
+=== GLSL Mapping
+
+When using `GL_KHR_tensor`:
+
+[source,glsl]
+----
+#extension GL_KHR_tensor : require
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform tensorKHR<float, 4> inputTensor;
+layout(set = 0, binding = 1) writeonly tensorKHR<float, 4> outputTensor;
+
+void main() {
+    uint coords[4] = uint[](
+        gl_GlobalInvocationID.z,
+        0,
+        gl_GlobalInvocationID.y,
+        gl_GlobalInvocationID.x
+    );
+
+    float val = tensorReadKHR(inputTensor, coords);
+    val = max(val, 0.0); // ReLU
+    tensorWriteKHR(outputTensor, coords, val);
+}
+----
+
+
+[[interactions]]
+== Interactions with Other Extensions
+
+=== VK_KHR_cooperative_matrix
+
+When both `VK_KHR_ml_primitives` and `VK_KHR_cooperative_matrix` are
+supported, the GEMM and fully-connected ML primitives *should* be
+implemented using cooperative matrix hardware where available.  The
+implementation *may* fall back to alternative strategies when the
+requested matrix dimensions or data types are not supported by the
+cooperative matrix path.
+
+Applications that require fine-grained control over cooperative matrix
+tile sizes *should* use `VK_KHR_cooperative_matrix` directly via
+compute shaders, loading from `VkTensorKHR` resources through SPIR-V
+tensor accessors.
+
+=== VK_KHR_deferred_host_operations
+
+`vkCreateMLGraphKHR` *may* be deferred using
+`VK_KHR_deferred_host_operations` when that extension is enabled.
+Graph compilation can be an expensive operation, and deferral allows
+applications to perform compilation on background threads.
+
+=== IREE and Compiler-based ML Stacks
+
+Compiler-based ML stacks such as IREE *may* target `VK_KHR_ml_primitives`
+in one of two modes:
+
+  * *Primitive mode*: The compiler maps each supported ML operation to
+    the corresponding `VkMLOperationTypeKHR` primitive, constructing a
+    `VkMLGraphKHR` at runtime.  This mode achieves maximum IHV
+    optimization.
+  * *Hybrid mode*: Unsupported operations are lowered to SPIR-V compute
+    shaders that read and write `VkTensorKHR` resources, while supported
+    operations use primitives.  Pipeline barriers synchronize between
+    the two execution domains.
+
+The SPIR-V `OpTypeTensorKHR` type system enables both modes to share
+tensor resources without intermediate copies.
+
+
+[[usage-example]]
+== Usage Example
+
+The following C++ example demonstrates creating two tensors, building a
+single-layer convolution graph, and dispatching it.
+
+[source,cpp]
+----
+#include <vulkan/vulkan.h>
+#include <array>
+#include <vector>
+#include <cassert>
+#include <cstring>
+
+// Assumes device, physicalDevice, computeQueue, commandPool, and
+// allocator are already initialized.
+// Error checking abbreviated for brevity; production code must check
+// every VkResult.
+
+// ---------------------------------------------------------------
+// 1. Query ML support
+// ---------------------------------------------------------------
+VkPhysicalDeviceMLFeaturesKHR mlFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+};
+VkPhysicalDeviceFeatures2 features2 = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext = &mlFeatures,
+};
+vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+assert(mlFeatures.tensorObjects && mlFeatures.mlPrimitives &&
+       mlFeatures.mlGraph && mlFeatures.fusedActivations);
+
+// ---------------------------------------------------------------
+// 2. Create input tensor: NCHW [1, 3, 224, 224], FP16
+// ---------------------------------------------------------------
+const std::array<uint32_t, 4> inputDims = {1, 3, 224, 224};
+VkTensorDescriptionKHR inputDesc = {
+    .sType          = VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+    .pNext          = nullptr,
+    .tiling         = VK_TENSOR_TILING_OPTIMAL_KHR,
+    .format         = VK_FORMAT_R16_SFLOAT,
+    .dimensionCount = 4,
+    .pDimensions    = inputDims.data(),
+    .pStrides       = nullptr,
+    .usage          = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR |
+                      VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR,
+};
+
+VkTensorCreateInfoKHR inputCI = {
+    .sType       = VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+    .pNext       = nullptr,
+    .flags       = 0,
+    .pDescription = &inputDesc,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+};
+
+VkTensorKHR inputTensor;
+vkCreateTensorKHR(device, &inputCI, nullptr, &inputTensor);
+
+// Query and bind memory
+VkTensorMemoryRequirementsInfoKHR memReqInfo = {
+    .sType  = VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+    .pNext  = nullptr,
+    .tensor = inputTensor,
+};
+VkMemoryRequirements2 memReqs = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    .pNext = nullptr,
+};
+vkGetTensorMemoryRequirementsKHR(device, &memReqInfo, &memReqs);
+
+VkMemoryAllocateInfo allocInfo = {
+    .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .pNext           = nullptr,
+    .allocationSize  = memReqs.memoryRequirements.size,
+    .memoryTypeIndex = /* select device-local type from memReqs */ 0,
+};
+VkDeviceMemory inputMemory;
+vkAllocateMemory(device, &allocInfo, nullptr, &inputMemory);
+
+VkBindTensorMemoryInfoKHR bindInfo = {
+    .sType        = VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+    .pNext        = nullptr,
+    .tensor       = inputTensor,
+    .memory       = inputMemory,
+    .memoryOffset = 0,
+};
+vkBindTensorMemoryKHR(device, 1, &bindInfo);
+
+// ---------------------------------------------------------------
+// 3. Create weight tensor: [64, 3, 3, 3] (64 filters, 3x3 kernel)
+// ---------------------------------------------------------------
+const std::array<uint32_t, 4> weightDims = {64, 3, 3, 3};
+VkTensorDescriptionKHR weightDesc = {
+    .sType          = VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+    .pNext          = nullptr,
+    .tiling         = VK_TENSOR_TILING_OPTIMAL_KHR,
+    .format         = VK_FORMAT_R16_SFLOAT,
+    .dimensionCount = 4,
+    .pDimensions    = weightDims.data(),
+    .pStrides       = nullptr,
+    .usage          = VK_TENSOR_USAGE_ML_GRAPH_WEIGHT_BIT_KHR |
+                      VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR,
+};
+// ... create, allocate, bind similarly to input tensor ...
+VkTensorKHR weightTensor;
+// (creation and binding omitted for brevity)
+
+// ---------------------------------------------------------------
+// 4. Create output tensor: [1, 64, 224, 224]
+// ---------------------------------------------------------------
+const std::array<uint32_t, 4> outputDims = {1, 64, 224, 224};
+VkTensorDescriptionKHR outputDesc = {
+    .sType          = VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+    .pNext          = nullptr,
+    .tiling         = VK_TENSOR_TILING_OPTIMAL_KHR,
+    .format         = VK_FORMAT_R16_SFLOAT,
+    .dimensionCount = 4,
+    .pDimensions    = outputDims.data(),
+    .pStrides       = nullptr,
+    .usage          = VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR |
+                      VK_TENSOR_USAGE_TRANSFER_SRC_BIT_KHR,
+};
+VkTensorKHR outputTensor;
+// (creation and binding omitted for brevity)
+
+// ---------------------------------------------------------------
+// 5. Define the convolution primitive
+// ---------------------------------------------------------------
+VkMLPrimitiveDescConvolutionKHR convDesc = {
+    .sType           = VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR,
+    .pNext           = nullptr,
+    .inputLayout     = VK_ML_TENSOR_LAYOUT_NCHW_KHR,
+    .kernelWidth     = 3,
+    .kernelHeight    = 3,
+    .strideX         = 1,
+    .strideY         = 1,
+    .dilationX       = 1,
+    .dilationY       = 1,
+    .paddingMode     = VK_ML_PADDING_MODE_SAME_KHR,
+    .paddingTop      = 0,
+    .paddingBottom   = 0,
+    .paddingLeft     = 0,
+    .paddingRight    = 0,
+    .groupCount      = 1,
+    .fusedActivation = VK_ML_ACTIVATION_FUNCTION_RELU_KHR,
+    .activationParam0 = 0.0f,
+    .activationParam1 = 0.0f,
+};
+
+// ---------------------------------------------------------------
+// 6. Build the ML graph (single convolution node)
+// ---------------------------------------------------------------
+VkMLTensorBindingKHR nodeInput = {
+    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+    .pNext              = nullptr,
+    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_INPUT_KHR,
+    .nodeIndex          = 0,
+    .tensorIndex        = 0,
+    .pTensorDescription = &inputDesc,
+};
+VkMLTensorBindingKHR nodeWeight = {
+    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+    .pNext              = nullptr,
+    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR,
+    .nodeIndex          = 0,
+    .tensorIndex        = 0,
+    .pTensorDescription = &weightDesc,
+};
+const VkMLTensorBindingKHR nodeInputs[] = {nodeInput, nodeWeight};
+
+VkMLTensorBindingKHR nodeOutput = {
+    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+    .pNext              = nullptr,
+    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR,
+    .nodeIndex          = 0,
+    .tensorIndex        = 0,
+    .pTensorDescription = &outputDesc,
+};
+
+VkMLGraphNodeCreateInfoKHR node = {
+    .sType          = VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+    .pNext          = nullptr,
+    .operationType  = VK_ML_OPERATION_TYPE_CONVOLUTION_2D_KHR,
+    .pOperationDesc = &convDesc,
+    .inputCount     = 2,
+    .pInputs        = nodeInputs,
+    .outputCount    = 1,
+    .pOutputs       = &nodeOutput,
+    .pNodeName      = "conv2d_relu",
+};
+
+VkMLGraphCreateInfoKHR graphCI = {
+    .sType                       = VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+    .pNext                       = nullptr,
+    .flags                       = 0,
+    .nodeCount                   = 1,
+    .pNodes                      = &node,
+    .externalInputCount          = 1,
+    .pExternalInputDescriptions  = &inputDesc,
+    .externalOutputCount         = 1,
+    .pExternalOutputDescriptions = &outputDesc,
+    .constantWeightCount         = 1,
+    .pConstantWeightDescriptions = &weightDesc,
+};
+
+VkMLGraphKHR mlGraph;
+vkCreateMLGraphKHR(device, &graphCI, nullptr, &mlGraph);
+
+// ---------------------------------------------------------------
+// 7. Query scratch memory and create session
+// ---------------------------------------------------------------
+VkMemoryRequirements2 scratchReqs = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+};
+vkGetMLGraphMemoryRequirementsKHR(device, mlGraph, &scratchReqs);
+
+VkDeviceMemory scratchMemory;
+VkMemoryAllocateInfo scratchAllocInfo = {
+    .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .allocationSize  = scratchReqs.memoryRequirements.size,
+    .memoryTypeIndex = /* device-local */ 0,
+};
+vkAllocateMemory(device, &scratchAllocInfo, nullptr, &scratchMemory);
+
+VkMLSessionCreateInfoKHR sessionCI = {
+    .sType               = VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
+    .pNext               = nullptr,
+    .flags               = 0,
+    .graph               = mlGraph,
+    .scratchMemory       = scratchMemory,
+    .scratchMemoryOffset = 0,
+    .scratchMemorySize   = scratchReqs.memoryRequirements.size,
+};
+
+VkMLSessionKHR session;
+vkCreateMLSessionKHR(device, &sessionCI, nullptr, &session);
+
+// ---------------------------------------------------------------
+// 8. Record and submit the ML dispatch
+// ---------------------------------------------------------------
+VkCommandBufferAllocateInfo cmdAllocInfo = {
+    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool        = commandPool,
+    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+};
+VkCommandBuffer cmdBuf;
+vkAllocateCommandBuffers(device, &cmdAllocInfo, &cmdBuf);
+
+VkCommandBufferBeginInfo beginInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+};
+vkBeginCommandBuffer(cmdBuf, &beginInfo);
+
+VkMLGraphDispatchInfoKHR dispatchInfo = {
+    .sType            = VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR,
+    .pNext            = nullptr,
+    .session          = session,
+    .inputTensorCount = 1,
+    .pInputTensors    = &inputTensor,
+    .outputTensorCount = 1,
+    .pOutputTensors   = &outputTensor,
+    .weightTensorCount = 1,
+    .pWeightTensors   = &weightTensor,
+};
+
+vkCmdDispatchMLGraphKHR(cmdBuf, &dispatchInfo);
+
+// Insert barrier: ML write -> transfer read
+VkTensorMemoryBarrierKHR barrier = {
+    .sType               = VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+    .pNext               = nullptr,
+    .srcAccessMask       = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+    .dstAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .tensor              = outputTensor,
+};
+VkTensorDependencyInfoKHR tensorDepInfo = {
+    .sType                    = VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR,
+    .pNext                    = nullptr,
+    .tensorMemoryBarrierCount = 1,
+    .pTensorMemoryBarriers    = &barrier,
+};
+VkDependencyInfo depInfo = {
+    .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .pNext                    = &tensorDepInfo,
+    .dependencyFlags          = 0,
+    .memoryBarrierCount       = 0,
+    .pMemoryBarriers          = nullptr,
+    .bufferMemoryBarrierCount = 0,
+    .pBufferMemoryBarriers    = nullptr,
+    .imageMemoryBarrierCount  = 0,
+    .pImageMemoryBarriers     = nullptr,
+};
+vkCmdPipelineBarrier2(cmdBuf, &depInfo);
+
+vkEndCommandBuffer(cmdBuf);
+
+// Submit with timeline semaphore signaling
+VkSemaphoreSubmitInfo signalInfo = {
+    .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+    .semaphore = timelineSemaphore,
+    .value     = 1,
+    .stageMask = VK_PIPELINE_STAGE_2_ML_GRAPH_BIT_KHR,
+};
+VkCommandBufferSubmitInfo cmdBufInfo = {
+    .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+    .commandBuffer = cmdBuf,
+};
+VkSubmitInfo2 submitInfo = {
+    .sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+    .commandBufferInfoCount   = 1,
+    .pCommandBufferInfos      = &cmdBufInfo,
+    .signalSemaphoreInfoCount = 1,
+    .pSignalSemaphoreInfos    = &signalInfo,
+};
+vkQueueSubmit2(computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+// ---------------------------------------------------------------
+// 9. Cleanup (after fence/semaphore wait)
+// ---------------------------------------------------------------
+// vkDestroyMLSessionKHR(device, session, nullptr);
+// vkDestroyMLGraphKHR(device, mlGraph, nullptr);
+// vkDestroyTensorKHR(device, outputTensor, nullptr);
+// vkDestroyTensorKHR(device, weightTensor, nullptr);
+// vkDestroyTensorKHR(device, inputTensor, nullptr);
+// vkFreeMemory(device, scratchMemory, nullptr);
+// ... free other memory ...
+----
+
+
+[[api-summary]]
+== Complete C API Summary
+
+=== Handles
+
+[source,c]
+----
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkTensorKHR)
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkTensorViewKHR)
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkMLGraphKHR)
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkMLSessionKHR)
+----
+
+=== Enumerations
+
+[source,c]
+----
+typedef enum VkTensorTilingKHR { ... };
+typedef enum VkTensorUsageFlagBitsKHR { ... };
+typedef enum VkMLOperationTypeKHR { ... };
+typedef enum VkMLActivationFunctionKHR { ... };
+typedef enum VkMLPaddingModeKHR { ... };
+typedef enum VkMLTensorLayoutKHR { ... };
+typedef enum VkMLTensorBindingTypeKHR { ... };
+----
+
+=== Function Prototypes
+
+[source,c]
+----
+// Tensor lifecycle
+VkResult vkCreateTensorKHR(
+    VkDevice device,
+    const VkTensorCreateInfoKHR* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkTensorKHR* pTensor);
+
+void vkDestroyTensorKHR(
+    VkDevice device,
+    VkTensorKHR tensor,
+    const VkAllocationCallbacks* pAllocator);
+
+VkResult vkCreateTensorViewKHR(
+    VkDevice device,
+    const VkTensorViewCreateInfoKHR* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkTensorViewKHR* pView);
+
+void vkDestroyTensorViewKHR(
+    VkDevice device,
+    VkTensorViewKHR view,
+    const VkAllocationCallbacks* pAllocator);
+
+// Tensor memory
+void vkGetTensorMemoryRequirementsKHR(
+    VkDevice device,
+    const VkTensorMemoryRequirementsInfoKHR* pInfo,
+    VkMemoryRequirements2* pMemoryRequirements);
+
+VkResult vkBindTensorMemoryKHR(
+    VkDevice device,
+    uint32_t bindInfoCount,
+    const VkBindTensorMemoryInfoKHR* pBindInfos);
+
+// Tensor commands
+void vkCmdCopyTensorKHR(
+    VkCommandBuffer commandBuffer,
+    const VkCopyTensorInfoKHR* pCopyInfo);
+
+// ML graph lifecycle
+VkResult vkCreateMLGraphKHR(
+    VkDevice device,
+    const VkMLGraphCreateInfoKHR* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkMLGraphKHR* pGraph);
+
+void vkDestroyMLGraphKHR(
+    VkDevice device,
+    VkMLGraphKHR graph,
+    const VkAllocationCallbacks* pAllocator);
+
+void vkGetMLGraphMemoryRequirementsKHR(
+    VkDevice device,
+    VkMLGraphKHR graph,
+    VkMemoryRequirements2* pMemoryRequirements);
+
+// ML session lifecycle
+VkResult vkCreateMLSessionKHR(
+    VkDevice device,
+    const VkMLSessionCreateInfoKHR* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkMLSessionKHR* pSession);
+
+void vkDestroyMLSessionKHR(
+    VkDevice device,
+    VkMLSessionKHR session,
+    const VkAllocationCallbacks* pAllocator);
+
+// ML dispatch
+void vkCmdDispatchMLGraphKHR(
+    VkCommandBuffer commandBuffer,
+    const VkMLGraphDispatchInfoKHR* pDispatchInfo);
+----
+
+
+[[version-history]]
+== Version History
+
+  * Revision 1, 2026-03-05 (Vulkan ML Subgroup)
+  ** Initial draft specification.
+  ** Unified tensor resource model from VK_ARM_tensors.
+  ** Unified ML graph model from VK_ARM_data_graph.
+  ** 21 ML primitive operation types.
+  ** SPIR-V environment for tensor shader access.
+  ** Synchronization model using existing Vulkan primitives.
