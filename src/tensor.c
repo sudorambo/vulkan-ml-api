@@ -142,6 +142,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vkBindTensorMemoryKHR(
         VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)info->tensor;
         if (t->memoryBound)
             return VK_ERROR_UNKNOWN;
+        if (VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN > 0 &&
+            info->memoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0)
+            return VK_ERROR_UNKNOWN;
         t->boundMemory = info->memory;
         t->memoryOffset = info->memoryOffset;
         t->memoryBound = VK_TRUE;

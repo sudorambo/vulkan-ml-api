@@ -1042,6 +1042,33 @@ Total: 2 tasks. Sequential.
 
 ---
 
+## Phase 24: Review Remediation — M3 (No Alignment Validation in vkBindTensorMemoryKHR)
+
+**Goal**: Add an ICD-level alignment check for `memoryOffset` in `vkBindTensorMemoryKHR` using the reference implementation's own `VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN` constant (64). The validation layer already checks `VUID_BIND_TENSOR_ALIGNMENT` against `props->minTensorMemoryAlignment`, but the ICD silently accepts misaligned offsets if the validation layer is disabled. Resolves MEDIUM finding M3 from `review-findings.md`.
+
+### Sub-phase 24a: Add alignment guard
+
+- [X] T147 In `src/tensor.c`, inside the `vkBindTensorMemoryKHR` bind loop, after the `if (t->memoryBound) return VK_ERROR_UNKNOWN;` guard (line 144) and before `t->boundMemory = info->memory;` (line 145), add: `if (VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN > 0 && info->memoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0) return VK_ERROR_UNKNOWN;`. This rejects misaligned offsets at the ICD level.
+
+### Sub-phase 24b: Build + test verification
+
+- [X] T148 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: `vkBindTensorMemoryKHR` now rejects misaligned `memoryOffset` at the ICD level. Validation layer provides the VUID diagnostic; ICD provides the safety net. All 13 tests pass.
+
+---
+
+### Phase 24 Dependencies
+
+```text
+Sub-phase 24a (guard):   T147 — single file change
+Sub-phase 24b (verify):  T148 — depends on T147
+
+Total: 2 tasks. Sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

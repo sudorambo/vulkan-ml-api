@@ -149,9 +149,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M3 — No alignment validation in vkBindTensorMemoryKHR
 
-- [ ] **File**: `src/tensor.c:140`
+- [x] **File**: `src/tensor.c:145-147`
 - **Description**: `memoryOffset` is not checked against `VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN`. The VUID is defined but unused at the ICD level.
 - **Fix**: Add alignment check or rely on validation layer (already implemented in `tensor_validation.c`).
+- **FIXED**: Phase 24 (T147-T148). Added `if (VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN > 0 && info->memoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0) return VK_ERROR_UNKNOWN;` guard. All 13 tests pass.
 
 ### M4 — Magic integer literals in format element size
 
