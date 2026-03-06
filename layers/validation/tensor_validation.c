@@ -140,7 +140,7 @@ VkBool32 vk_ml_validate_tensor_copy(
 {
     if (!pCopyInfo)
         return VK_FALSE;
-    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR)
+    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_COPY_TENSOR_SAME */

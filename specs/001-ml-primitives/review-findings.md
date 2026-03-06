@@ -238,9 +238,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M15 — Naming inconsistency: sType vs struct name
 
-- [ ] [P] **File**: `include/vulkan/vulkan_ml_primitives.h:59`
+- [x] [P] **File**: `include/vulkan/vulkan_ml_primitives.h:59`
 - **Description**: `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` maps to struct `VkCopyTensorInfoKHR`. Vulkan convention maps `VkFooBar` to `VK_STRUCTURE_TYPE_FOO_BAR`. Should be `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR`.
 - **Fix**: Rename to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` and update all references.
+- **FIXED**: Phase 35 (T175-T179). Renamed across 4 files: `vulkan_ml_primitives.h` (definition), `tensor_validation.c` (sType check), `test_tensor_copy.c` (2 usages), `VK_KHR_ml_primitives.adoc` (spec). Full rebuild, all 13 tests pass.
 
 ### M16 — PReLU test uses wrong activation type
 

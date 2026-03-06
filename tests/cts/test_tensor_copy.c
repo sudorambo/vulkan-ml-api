@@ -69,7 +69,7 @@ static int test_copy_basic(void)
         .pExtents = ext,
     };
     VkCopyTensorInfoKHR copyInfo = {
-        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR,
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR,
         .pNext = NULL,
         .srcTensor = src,
         .dstTensor = dst,
@@ -156,7 +156,7 @@ static int test_copy_null_cmd(void)
         .pExtents = ext,
     };
     VkCopyTensorInfoKHR copyInfo = {
-        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR,
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR,
         .pNext = NULL,
         .srcTensor = src,
         .dstTensor = dst,

@@ -1358,6 +1358,39 @@ Total: 1 task.
 
 ---
 
+## Phase 35: Review Remediation — M15 (Naming inconsistency: sType vs struct name)
+
+**Goal**: Rename `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` → `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` to follow Vulkan naming convention (`VkCopyTensorInfoKHR` → `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR`). Pure rename, no logic changes. Resolves MEDIUM finding M15 from `review-findings.md`.
+
+### Sub-phase 35a: Rename across source files (parallelizable)
+
+- [X] T175 [P] In `include/vulkan/vulkan_ml_primitives.h`, rename `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` (line 59). Numeric value `1000559010` unchanged.
+
+- [X] T176 [P] In `layers/validation/tensor_validation.c`, rename `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` (line 143).
+
+- [X] T177 [P] In `tests/cts/test_tensor_copy.c`, rename both occurrences of `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` (lines 72, 159).
+
+- [X] T178 [P] In `spec/VK_KHR_ml_primitives.adoc`, rename `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` (line 141).
+
+### Sub-phase 35b: Build + test verification
+
+- [X] T179 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: sType naming follows Vulkan convention. All 13 tests pass.
+
+---
+
+### Phase 35 Dependencies
+
+```text
+Sub-phase 35a (rename): T175, T176, T177, T178 — [P] (different files)
+Sub-phase 35b (verify): T179 — depends on T175-T178
+
+Total: 5 tasks. T175-T178 parallelizable. T179 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
