@@ -1129,6 +1129,35 @@ Total: 3 tasks. T151 and T152 parallelizable. T153 final.
 
 ---
 
+## Phase 27: Review Remediation — M6 (Inconsistent Include Pattern in Impl Files)
+
+**Goal**: Replace `#include <vulkan/vulkan_ml_primitives.h>` with `#include "internal.h"` in the 2 remaining implementation files that use the public header directly. All other `src/*.c` files already use `"internal.h"`. Resolves MEDIUM finding M6 from `review-findings.md`.
+
+### Sub-phase 27a: Fix includes (parallelizable)
+
+- [X] T154 [P] In `src/tensor_copy.c`, replace `#include <vulkan/vulkan_ml_primitives.h>` (line 9) with `#include "internal.h"`.
+
+- [X] T155 [P] In `src/ml_dispatch.c`, replace `#include <vulkan/vulkan_ml_primitives.h>` (line 9) with `#include "internal.h"`.
+
+### Sub-phase 27b: Build + test verification
+
+- [X] T156 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. Verify: `grep -rn 'vulkan_ml_primitives.h' src/` returns zero matches (all impl files now use `internal.h`).
+
+**Checkpoint**: All `src/*.c` files consistently include `"internal.h"`. No direct public header includes remain in implementation code. All 13 tests pass.
+
+---
+
+### Phase 27 Dependencies
+
+```text
+Sub-phase 27a (includes): T154, T155 — [P] (different files)
+Sub-phase 27b (verify):   T156 — depends on T154, T155
+
+Total: 3 tasks. T154, T155 parallelizable. T156 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

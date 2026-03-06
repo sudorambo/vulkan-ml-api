@@ -6,7 +6,7 @@
  * Actual GPU copy is IHV-specific; reference impl records intent.
  */
 
-#include <vulkan/vulkan_ml_primitives.h>
+#include "internal.h"
 
 /* ------------------------------------------------------------------ */
 /* Tensor copy command                                                */

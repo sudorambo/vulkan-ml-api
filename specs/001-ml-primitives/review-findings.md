@@ -170,10 +170,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M6 — Inconsistent include pattern in 3 impl files
 
-- [ ] [P] **Files**: ~~`src/tensor_barrier.c`~~, `src/tensor_copy.c`, `src/ml_dispatch.c`
+- [x] [P] **Files**: ~~`src/tensor_barrier.c`~~, `src/tensor_copy.c`, `src/ml_dispatch.c`
 - **Description**: These files include `<vulkan/vulkan_ml_primitives.h>` directly instead of `"internal.h"`, unlike the other 5 implementation files. They cannot use internal helpers, VUID constants, or struct definitions.
 - **Fix**: Change to `#include "internal.h"` for consistency. If these files genuinely don't need internal symbols, document the rationale.
-- **PARTIAL**: `src/tensor_barrier.c` was deleted during H6 fix (Phase 17). 2 of 3 original files remain (`tensor_copy.c`, `ml_dispatch.c`).
+- **FIXED**: Phase 27 (T154-T156). Replaced direct public header includes with `"internal.h"` in both remaining files. `tensor_barrier.c` was already deleted in H6/Phase 17. All `src/*.c` files now consistently use `"internal.h"`. All 13 tests pass.
 
 ### M7 — No sType validation anywhere
 
