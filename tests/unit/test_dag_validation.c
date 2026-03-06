@@ -7,7 +7,6 @@
 #include "../../src/internal.h"
 #include "../../layers/validation/vk_ml_validation.h"
 #include <stdio.h>
-#include <string.h>
 
 extern void vk_ml_populate_features(VkPhysicalDeviceMLFeaturesKHR *features);
 extern void vk_ml_populate_properties(VkPhysicalDeviceMLPropertiesKHR *props);

@@ -6,8 +6,6 @@
 #include <vulkan/vulkan_ml_primitives.h>
 #include "../../src/internal.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 static int g_fail_count = 0;
 

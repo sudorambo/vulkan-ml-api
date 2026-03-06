@@ -4,7 +4,6 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include "../../src/internal.h"
 #include "../../layers/validation/vk_ml_validation.h"
 #include <stdio.h>
 #include <string.h>

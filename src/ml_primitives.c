@@ -4,7 +4,6 @@
  */
 
 #include "internal.h"
-#include <math.h>
 
 /* ------------------------------------------------------------------ */
 /* Primitive descriptor validation                                    */

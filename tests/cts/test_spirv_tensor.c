@@ -7,7 +7,6 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include "internal.h"
 #include <stdio.h>
 #include <string.h>
 

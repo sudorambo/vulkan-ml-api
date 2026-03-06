@@ -3,7 +3,7 @@
  * @brief VK_KHR_ml_primitives tensor memory barrier validation.
  */
 
-#include "internal.h"
+#include <vulkan/vulkan_ml_primitives.h>
 
 /* Valid access mask bits for tensor memory barriers */
 static const VkAccessFlags2 VALID_TENSOR_ACCESS_MASK =

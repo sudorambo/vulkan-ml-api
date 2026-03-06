@@ -6,10 +6,8 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include "internal.h"
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define MOCK_DEVICE_MEMORY ((VkDeviceMemory)(uintptr_t)0x1)

@@ -6,7 +6,7 @@
  * Actual GPU execution is IHV-specific.
  */
 
-#include "internal.h"
+#include <vulkan/vulkan_ml_primitives.h>
 
 /* ------------------------------------------------------------------ */
 /* ML graph dispatch command                                         */

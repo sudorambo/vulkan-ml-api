@@ -4,7 +4,6 @@
  */
 
 #include "../validation/vk_ml_validation.h"
-#include "../../src/internal.h"
 
 #include <stddef.h>
 
