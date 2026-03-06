@@ -142,9 +142,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M2 — No double-bind protection in vkBindTensorMemoryKHR
 
-- [ ] **File**: `src/tensor.c:133-142`
+- [x] **File**: `src/tensor.c:142-144`
 - **Description**: `vkBindTensorMemoryKHR` doesn't check `tensor->memoryBound` before overwriting. A tensor can be silently re-bound, violating Vulkan semantics. The VUID is defined but not checked at the ICD level.
 - **Fix**: Add `if (t->memoryBound) return VK_ERROR_UNKNOWN;` before setting bind state, or rely on the validation layer check (already implemented in `tensor_validation.c`).
+- **FIXED**: Phase 23 (T145-T146). Added `if (t->memoryBound) return VK_ERROR_UNKNOWN;` guard in bind loop. Validation layer provides VUID diagnostic; ICD provides safety net. All 13 tests pass.
 
 ### M3 — No alignment validation in vkBindTensorMemoryKHR
 

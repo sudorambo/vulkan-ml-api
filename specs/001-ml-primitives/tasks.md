@@ -1015,6 +1015,33 @@ Total: 5 tasks. T140-T143 fully parallelizable. T144 final.
 
 ---
 
+## Phase 23: Review Remediation — M2 (No Double-Bind Protection in vkBindTensorMemoryKHR)
+
+**Goal**: Add an ICD-level guard in `vkBindTensorMemoryKHR` to reject re-binding a tensor that already has memory bound. The validation layer already checks `VUID_BIND_TENSOR_ALREADY_BOUND`, but the ICD silently overwrites on re-bind if the validation layer is disabled. Resolves MEDIUM finding M2 from `review-findings.md`.
+
+### Sub-phase 23a: Add double-bind guard
+
+- [X] T145 In `src/tensor.c`, inside the `vkBindTensorMemoryKHR` bind loop (after line 142: `VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)info->tensor;`), add `if (t->memoryBound) return VK_ERROR_UNKNOWN;` before the lines that overwrite `boundMemory`, `memoryOffset`, and `memoryBound`. This prevents silent re-binding when the validation layer is disabled.
+
+### Sub-phase 23b: Build + test verification
+
+- [X] T146 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. The existing `test_tensor_double_bind` in `tests/validation/test_vuids.c` exercises the validation layer path; the ICD guard is an independent safety net.
+
+**Checkpoint**: `vkBindTensorMemoryKHR` now rejects double-bind at the ICD level with `VK_ERROR_UNKNOWN`. Validation layer continues to provide the detailed VUID diagnostic. All 13 tests pass.
+
+---
+
+### Phase 23 Dependencies
+
+```text
+Sub-phase 23a (guard):   T145 — single file change
+Sub-phase 23b (verify):  T146 — depends on T145
+
+Total: 2 tasks. Sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
