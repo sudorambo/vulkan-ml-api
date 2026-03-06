@@ -12,9 +12,8 @@
 /* Tensor copy command                                                */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(
-    VkCommandBuffer                 commandBuffer,
-    const VkCopyTensorInfoKHR*      pCopyInfo)
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(VkCommandBuffer commandBuffer,
+                                              const VkCopyTensorInfoKHR *pCopyInfo)
 {
     (void)commandBuffer;
     (void)pCopyInfo;

@@ -23,8 +23,7 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
     switch (opType) {
     case VK_ML_OPERATION_TYPE_CONVOLUTION_2D_KHR:
     case VK_ML_OPERATION_TYPE_DECONVOLUTION_2D_KHR: {
-        const VkMLPrimitiveDescConvolutionKHR *d =
-            (const VkMLPrimitiveDescConvolutionKHR *)pDesc;
+        const VkMLPrimitiveDescConvolutionKHR *d = (const VkMLPrimitiveDescConvolutionKHR *)pDesc;
         if (d->strideX == 0 || d->strideY == 0)
             return VK_FALSE;
         if (d->dilationX == 0 || d->dilationY == 0)
@@ -45,8 +44,7 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
     case VK_ML_OPERATION_TYPE_MAX_POOL_2D_KHR:
     case VK_ML_OPERATION_TYPE_AVERAGE_POOL_2D_KHR:
     case VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR: {
-        const VkMLPrimitiveDescPoolingKHR *d =
-            (const VkMLPrimitiveDescPoolingKHR *)pDesc;
+        const VkMLPrimitiveDescPoolingKHR *d = (const VkMLPrimitiveDescPoolingKHR *)pDesc;
         if (d->poolType == VK_ML_OPERATION_TYPE_MAX_POOL_2D_KHR ||
             d->poolType == VK_ML_OPERATION_TYPE_AVERAGE_POOL_2D_KHR) {
             if (d->windowWidth == 0 || d->windowHeight == 0)
@@ -62,8 +60,7 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
     case VK_ML_OPERATION_TYPE_LEAKY_RELU_KHR:
     case VK_ML_OPERATION_TYPE_PRELU_KHR:
     case VK_ML_OPERATION_TYPE_SOFTMAX_KHR: {
-        const VkMLPrimitiveDescActivationKHR *d =
-            (const VkMLPrimitiveDescActivationKHR *)pDesc;
+        const VkMLPrimitiveDescActivationKHR *d = (const VkMLPrimitiveDescActivationKHR *)pDesc;
         if (!is_finite_float(d->param0) || !is_finite_float(d->param1))
             return VK_FALSE;
         break;
@@ -80,22 +77,19 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
     }
     case VK_ML_OPERATION_TYPE_ELEMENTWISE_ADD_KHR:
     case VK_ML_OPERATION_TYPE_ELEMENTWISE_MUL_KHR: {
-        const VkMLPrimitiveDescElementwiseKHR *d =
-            (const VkMLPrimitiveDescElementwiseKHR *)pDesc;
+        const VkMLPrimitiveDescElementwiseKHR *d = (const VkMLPrimitiveDescElementwiseKHR *)pDesc;
         if (!is_finite_float(d->activationParam0) || !is_finite_float(d->activationParam1))
             return VK_FALSE;
         break;
     }
     case VK_ML_OPERATION_TYPE_CONCAT_KHR: {
-        const VkMLPrimitiveDescConcatKHR *d =
-            (const VkMLPrimitiveDescConcatKHR *)pDesc;
+        const VkMLPrimitiveDescConcatKHR *d = (const VkMLPrimitiveDescConcatKHR *)pDesc;
         if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR)
             return VK_FALSE;
         break;
     }
     case VK_ML_OPERATION_TYPE_RESHAPE_KHR: {
-        const VkMLPrimitiveDescReshapeKHR *d =
-            (const VkMLPrimitiveDescReshapeKHR *)pDesc;
+        const VkMLPrimitiveDescReshapeKHR *d = (const VkMLPrimitiveDescReshapeKHR *)pDesc;
         if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR)
             return VK_FALSE;
         if (d->dimensionCount == 0 || !d->pOutputDimensions)
@@ -107,8 +101,7 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
         break;
     }
     case VK_ML_OPERATION_TYPE_TRANSPOSE_KHR: {
-        const VkMLPrimitiveDescTransposeKHR *d =
-            (const VkMLPrimitiveDescTransposeKHR *)pDesc;
+        const VkMLPrimitiveDescTransposeKHR *d = (const VkMLPrimitiveDescTransposeKHR *)pDesc;
         if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR)
             return VK_FALSE;
         if (d->dimensionCount == 0 || !d->pPermutation)
@@ -116,8 +109,7 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
         break;
     }
     case VK_ML_OPERATION_TYPE_RESIZE_KHR: {
-        const VkMLPrimitiveDescResizeKHR *d =
-            (const VkMLPrimitiveDescResizeKHR *)pDesc;
+        const VkMLPrimitiveDescResizeKHR *d = (const VkMLPrimitiveDescResizeKHR *)pDesc;
         if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR)
             return VK_FALSE;
         if (d->scaleHeight <= 0.0f || d->scaleWidth <= 0.0f)

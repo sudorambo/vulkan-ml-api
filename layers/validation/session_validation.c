@@ -3,15 +3,14 @@
  * @brief ML session creation validation for VK_KHR_ml_primitives.
  */
 
-#include "vk_ml_validation.h"
 #include "internal.h"
+#include "vk_ml_validation.h"
 
 #include <stddef.h>
 
-VkBool32 vk_ml_validate_session_create(
-    const VkMLSessionCreateInfoKHR *pCreateInfo,
-    VkDeviceSize requiredScratchSize,
-    const VkPhysicalDeviceMLFeaturesKHR *features)
+VkBool32 vk_ml_validate_session_create(const VkMLSessionCreateInfoKHR *pCreateInfo,
+                                       VkDeviceSize requiredScratchSize,
+                                       const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!pCreateInfo || !features)
         return VK_FALSE;

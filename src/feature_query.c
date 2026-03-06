@@ -71,7 +71,7 @@ static const VkFormat vk_ml_supported_tensor_formats[] = {
     (VkFormat)VK_FORMAT_R8_BOOL_KHR,
 };
 
-#define VK_ML_SUPPORTED_TENSOR_FORMAT_COUNT \
+#define VK_ML_SUPPORTED_TENSOR_FORMAT_COUNT                                                        \
     (sizeof(vk_ml_supported_tensor_formats) / sizeof(vk_ml_supported_tensor_formats[0]))
 
 VkBool32 vk_ml_is_tensor_format_supported(VkFormat format)
@@ -83,8 +83,7 @@ VkBool32 vk_ml_is_tensor_format_supported(VkFormat format)
     return VK_FALSE;
 }
 
-void vk_ml_populate_tensor_format_properties(VkFormat format,
-                                             VkTensorFormatPropertiesKHR *props)
+void vk_ml_populate_tensor_format_properties(VkFormat format, VkTensorFormatPropertiesKHR *props)
 {
     if (!props)
         return;

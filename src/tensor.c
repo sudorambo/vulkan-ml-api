@@ -9,11 +9,10 @@
 /* Tensor creation and destruction                                    */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
-    VkDevice                        device,
-    const VkTensorCreateInfoKHR*    pCreateInfo,
-    const VkAllocationCallbacks*    pAllocator,
-    VkTensorKHR*                    pTensor)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(VkDevice device,
+                                                 const VkTensorCreateInfoKHR *pCreateInfo,
+                                                 const VkAllocationCallbacks *pAllocator,
+                                                 VkTensorKHR *pTensor)
 {
     (void)device;
     if (!pCreateInfo || !pCreateInfo->pDescription || !pTensor)
@@ -21,10 +20,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
     if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR)
         return VK_ERROR_UNKNOWN;
 
-    const VkTensorDescriptionKHR* desc = pCreateInfo->pDescription;
+    const VkTensorDescriptionKHR *desc = pCreateInfo->pDescription;
     const uint32_t dimCount = desc->dimensionCount;
 
-    VkTensorKHR_T* tensor = (VkTensorKHR_T*)vk_ml_alloc(pAllocator, sizeof(VkTensorKHR_T));
+    VkTensorKHR_T *tensor = (VkTensorKHR_T *)vk_ml_alloc(pAllocator, sizeof(VkTensorKHR_T));
     if (!tensor)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
@@ -40,7 +39,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
     tensor->queueFamilyIndices = NULL;
 
     if (dimCount > 0 && desc->pDimensions) {
-        tensor->dimensions = (uint32_t*)vk_ml_alloc(pAllocator, dimCount * sizeof(uint32_t));
+        tensor->dimensions = (uint32_t *)vk_ml_alloc(pAllocator, dimCount * sizeof(uint32_t));
         if (!tensor->dimensions) {
             vk_ml_free(pAllocator, tensor);
             return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -49,7 +48,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
     }
 
     if (dimCount > 0 && desc->pStrides) {
-        tensor->strides = (VkDeviceSize*)vk_ml_alloc(pAllocator, dimCount * sizeof(VkDeviceSize));
+        tensor->strides = (VkDeviceSize *)vk_ml_alloc(pAllocator, dimCount * sizeof(VkDeviceSize));
         if (!tensor->strides) {
             vk_ml_free(pAllocator, tensor->dimensions);
             vk_ml_free(pAllocator, tensor);
@@ -63,8 +62,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
     tensor->description.pNext = NULL;
 
     if (pCreateInfo->queueFamilyIndexCount > 0 && pCreateInfo->pQueueFamilyIndices) {
-        tensor->queueFamilyIndices = (uint32_t*)vk_ml_alloc(pAllocator,
-            pCreateInfo->queueFamilyIndexCount * sizeof(uint32_t));
+        tensor->queueFamilyIndices = (uint32_t *)vk_ml_alloc(
+            pAllocator, pCreateInfo->queueFamilyIndexCount * sizeof(uint32_t));
         if (!tensor->queueFamilyIndices) {
             vk_ml_free(pAllocator, tensor->strides);
             vk_ml_free(pAllocator, tensor->dimensions);
@@ -72,23 +71,21 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
             return VK_ERROR_OUT_OF_HOST_MEMORY;
         }
         memcpy(tensor->queueFamilyIndices, pCreateInfo->pQueueFamilyIndices,
-            pCreateInfo->queueFamilyIndexCount * sizeof(uint32_t));
+               pCreateInfo->queueFamilyIndexCount * sizeof(uint32_t));
     }
 
     *pTensor = (VkTensorKHR)(uintptr_t)tensor;
     return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL vkDestroyTensorKHR(
-    VkDevice                        device,
-    VkTensorKHR                     tensor,
-    const VkAllocationCallbacks*    pAllocator)
+VKAPI_ATTR void VKAPI_CALL vkDestroyTensorKHR(VkDevice device, VkTensorKHR tensor,
+                                              const VkAllocationCallbacks *pAllocator)
 {
     (void)device;
     if (tensor == VK_NULL_HANDLE)
         return;
 
-    VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)tensor;
+    VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)tensor;
     vk_ml_free(pAllocator, t->dimensions);
     vk_ml_free(pAllocator, t->strides);
     vk_ml_free(pAllocator, t->queueFamilyIndices);
@@ -99,20 +96,19 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyTensorKHR(
 /* Tensor memory requirements and binding                             */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR void VKAPI_CALL vkGetTensorMemoryRequirementsKHR(
-    VkDevice                                    device,
-    const VkTensorMemoryRequirementsInfoKHR*   pInfo,
-    VkMemoryRequirements2*                      pMemoryRequirements)
+VKAPI_ATTR void VKAPI_CALL
+vkGetTensorMemoryRequirementsKHR(VkDevice device, const VkTensorMemoryRequirementsInfoKHR *pInfo,
+                                 VkMemoryRequirements2 *pMemoryRequirements)
 {
     (void)device;
     if (!pInfo || !pMemoryRequirements || pInfo->tensor == VK_NULL_HANDLE)
         return;
 
-    VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)pInfo->tensor;
-    const VkTensorDescriptionKHR* desc = &t->description;
+    VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)pInfo->tensor;
+    const VkTensorDescriptionKHR *desc = &t->description;
 
     VkDeviceSize elementCount = 1;
-    const uint32_t* dims = desc->pDimensions;
+    const uint32_t *dims = desc->pDimensions;
     if (dims && desc->dimensionCount > 0) {
         for (uint32_t i = 0; i < desc->dimensionCount; i++)
             elementCount *= (VkDeviceSize)dims[i];
@@ -128,21 +124,19 @@ VKAPI_ATTR void VKAPI_CALL vkGetTensorMemoryRequirementsKHR(
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0xFFFFFFFFu;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL vkBindTensorMemoryKHR(
-    VkDevice                              device,
-    uint32_t                              bindInfoCount,
-    const VkBindTensorMemoryInfoKHR*      pBindInfos)
+VKAPI_ATTR VkResult VKAPI_CALL vkBindTensorMemoryKHR(VkDevice device, uint32_t bindInfoCount,
+                                                     const VkBindTensorMemoryInfoKHR *pBindInfos)
 {
     (void)device;
     if (!pBindInfos)
         return VK_ERROR_UNKNOWN;
 
     for (uint32_t i = 0; i < bindInfoCount; i++) {
-        const VkBindTensorMemoryInfoKHR* info = &pBindInfos[i];
+        const VkBindTensorMemoryInfoKHR *info = &pBindInfos[i];
         if (info->tensor == VK_NULL_HANDLE)
             return VK_ERROR_UNKNOWN;
 
-        VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)info->tensor;
+        VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)info->tensor;
         if (t->memoryBound)
             return VK_ERROR_UNKNOWN;
         if (VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN > 0 &&

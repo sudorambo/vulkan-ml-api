@@ -5,12 +5,12 @@
  * Workflow: create tensors -> build graph -> create session -> dispatch -> cleanup.
  */
 
-#include <vulkan/vulkan_ml_primitives.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <vulkan/vulkan_ml_primitives.h>
 
-#define MOCK_DEVICE_MEMORY ((VkDeviceMemory)(uintptr_t)0x1)
+#define MOCK_DEVICE_MEMORY  ((VkDeviceMemory)(uintptr_t)0x1)
 #define MOCK_COMMAND_BUFFER ((VkCommandBuffer)(uintptr_t)0x1)
 
 int main(void)

@@ -19,14 +19,13 @@ static VkDeviceSize tensor_desc_size(const VkTensorDescriptionKHR *desc)
     return count * vk_ml_format_element_size(desc->format);
 }
 
-static VkTensorDescriptionKHR *deep_copy_tensor_desc(
-    const VkTensorDescriptionKHR *src,
-    const VkAllocationCallbacks *pAllocator)
+static VkTensorDescriptionKHR *deep_copy_tensor_desc(const VkTensorDescriptionKHR *src,
+                                                     const VkAllocationCallbacks *pAllocator)
 {
     if (!src)
         return NULL;
-    VkTensorDescriptionKHR *dst = (VkTensorDescriptionKHR *)vk_ml_alloc(
-        pAllocator, sizeof(VkTensorDescriptionKHR));
+    VkTensorDescriptionKHR *dst =
+        (VkTensorDescriptionKHR *)vk_ml_alloc(pAllocator, sizeof(VkTensorDescriptionKHR));
     if (!dst)
         return NULL;
     *dst = *src;
@@ -35,33 +34,30 @@ static VkTensorDescriptionKHR *deep_copy_tensor_desc(
     dst->pStrides = NULL;
 
     if (src->dimensionCount > 0 && src->pDimensions) {
-        dst->pDimensions = (const uint32_t *)vk_ml_alloc(pAllocator,
-            src->dimensionCount * sizeof(uint32_t));
+        dst->pDimensions =
+            (const uint32_t *)vk_ml_alloc(pAllocator, src->dimensionCount * sizeof(uint32_t));
         if (!dst->pDimensions) {
             vk_ml_free(pAllocator, dst);
             return NULL;
         }
-        memcpy((void *)dst->pDimensions, src->pDimensions,
-            src->dimensionCount * sizeof(uint32_t));
+        memcpy((void *)dst->pDimensions, src->pDimensions, src->dimensionCount * sizeof(uint32_t));
     }
     if (src->dimensionCount > 0 && src->pStrides) {
-        dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator,
-            src->dimensionCount * sizeof(VkDeviceSize));
+        dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator, src->dimensionCount *
+                                                                          sizeof(VkDeviceSize));
         if (!dst->pStrides) {
             vk_ml_free(pAllocator, (void *)dst->pDimensions);
             vk_ml_free(pAllocator, dst);
             return NULL;
         }
-        memcpy((void *)dst->pStrides, src->pStrides,
-            src->dimensionCount * sizeof(VkDeviceSize));
+        memcpy((void *)dst->pStrides, src->pStrides, src->dimensionCount * sizeof(VkDeviceSize));
     }
     return dst;
 }
 
-static VkResult deep_copy_tensor_desc_into(
-    VkTensorDescriptionKHR *dst,
-    const VkTensorDescriptionKHR *src,
-    const VkAllocationCallbacks *pAllocator)
+static VkResult deep_copy_tensor_desc_into(VkTensorDescriptionKHR *dst,
+                                           const VkTensorDescriptionKHR *src,
+                                           const VkAllocationCallbacks *pAllocator)
 {
     *dst = *src;
     dst->pNext = NULL;
@@ -69,23 +65,21 @@ static VkResult deep_copy_tensor_desc_into(
     dst->pStrides = NULL;
 
     if (src->dimensionCount > 0 && src->pDimensions) {
-        dst->pDimensions = (const uint32_t *)vk_ml_alloc(pAllocator,
-            src->dimensionCount * sizeof(uint32_t));
+        dst->pDimensions =
+            (const uint32_t *)vk_ml_alloc(pAllocator, src->dimensionCount * sizeof(uint32_t));
         if (!dst->pDimensions)
             return VK_ERROR_OUT_OF_HOST_MEMORY;
-        memcpy((void *)dst->pDimensions, src->pDimensions,
-            src->dimensionCount * sizeof(uint32_t));
+        memcpy((void *)dst->pDimensions, src->pDimensions, src->dimensionCount * sizeof(uint32_t));
     }
     if (src->dimensionCount > 0 && src->pStrides) {
-        dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator,
-            src->dimensionCount * sizeof(VkDeviceSize));
+        dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator, src->dimensionCount *
+                                                                          sizeof(VkDeviceSize));
         if (!dst->pStrides) {
             vk_ml_free(pAllocator, (void *)dst->pDimensions);
             dst->pDimensions = NULL;
             return VK_ERROR_OUT_OF_HOST_MEMORY;
         }
-        memcpy((void *)dst->pStrides, src->pStrides,
-            src->dimensionCount * sizeof(VkDeviceSize));
+        memcpy((void *)dst->pStrides, src->pStrides, src->dimensionCount * sizeof(VkDeviceSize));
     }
     return VK_SUCCESS;
 }
@@ -131,8 +125,7 @@ static size_t op_desc_size_by_stype(VkStructureType sType)
     }
 }
 
-static void *deep_copy_op_desc(const void *pDesc,
-                               const VkAllocationCallbacks *pAllocator)
+static void *deep_copy_op_desc(const void *pDesc, const VkAllocationCallbacks *pAllocator)
 {
     if (!pDesc)
         return NULL;
@@ -149,32 +142,28 @@ static void *deep_copy_op_desc(const void *pDesc,
     /* Deep-copy pointer-containing descriptors */
     uint32_t desc_stype = (uint32_t)base->sType;
     if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR) {
-        VkMLPrimitiveDescReshapeKHR *reshape =
-            (VkMLPrimitiveDescReshapeKHR *)copy;
+        VkMLPrimitiveDescReshapeKHR *reshape = (VkMLPrimitiveDescReshapeKHR *)copy;
         if (reshape->dimensionCount > 0 && reshape->pOutputDimensions) {
-            uint32_t *dims = (uint32_t *)vk_ml_alloc(pAllocator,
-                reshape->dimensionCount * sizeof(uint32_t));
+            uint32_t *dims =
+                (uint32_t *)vk_ml_alloc(pAllocator, reshape->dimensionCount * sizeof(uint32_t));
             if (!dims) {
                 vk_ml_free(pAllocator, copy);
                 return NULL;
             }
-            memcpy(dims, reshape->pOutputDimensions,
-                reshape->dimensionCount * sizeof(uint32_t));
+            memcpy(dims, reshape->pOutputDimensions, reshape->dimensionCount * sizeof(uint32_t));
             reshape->pOutputDimensions = dims;
         }
     }
     if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR) {
-        VkMLPrimitiveDescTransposeKHR *transpose =
-            (VkMLPrimitiveDescTransposeKHR *)copy;
+        VkMLPrimitiveDescTransposeKHR *transpose = (VkMLPrimitiveDescTransposeKHR *)copy;
         if (transpose->dimensionCount > 0 && transpose->pPermutation) {
-            uint32_t *perm = (uint32_t *)vk_ml_alloc(pAllocator,
-                transpose->dimensionCount * sizeof(uint32_t));
+            uint32_t *perm =
+                (uint32_t *)vk_ml_alloc(pAllocator, transpose->dimensionCount * sizeof(uint32_t));
             if (!perm) {
                 vk_ml_free(pAllocator, copy);
                 return NULL;
             }
-            memcpy(perm, transpose->pPermutation,
-                transpose->dimensionCount * sizeof(uint32_t));
+            memcpy(perm, transpose->pPermutation, transpose->dimensionCount * sizeof(uint32_t));
             transpose->pPermutation = perm;
         }
     }
@@ -188,23 +177,21 @@ static void free_binding_deep_data(VkMLTensorBindingKHR *binding,
     if (!binding)
         return;
     if (binding->pTensorDescription) {
-        VkTensorDescriptionKHR *td =
-            (VkTensorDescriptionKHR *)binding->pTensorDescription;
+        VkTensorDescriptionKHR *td = (VkTensorDescriptionKHR *)binding->pTensorDescription;
         free_tensor_desc_arrays(td, pAllocator);
         vk_ml_free(pAllocator, td);
         binding->pTensorDescription = NULL;
     }
 }
 
-static VkMLTensorBindingKHR *deep_copy_bindings(
-    const VkMLTensorBindingKHR *pBindings,
-    uint32_t count,
-    const VkAllocationCallbacks *pAllocator)
+static VkMLTensorBindingKHR *deep_copy_bindings(const VkMLTensorBindingKHR *pBindings,
+                                                uint32_t count,
+                                                const VkAllocationCallbacks *pAllocator)
 {
     if (!pBindings || count == 0)
         return NULL;
-    VkMLTensorBindingKHR *dst = (VkMLTensorBindingKHR *)vk_ml_alloc(
-        pAllocator, count * sizeof(VkMLTensorBindingKHR));
+    VkMLTensorBindingKHR *dst =
+        (VkMLTensorBindingKHR *)vk_ml_alloc(pAllocator, count * sizeof(VkMLTensorBindingKHR));
     if (!dst)
         return NULL;
 
@@ -214,8 +201,8 @@ static VkMLTensorBindingKHR *deep_copy_bindings(
         dst[i].pTensorDescription = NULL;
 
         if (pBindings[i].pTensorDescription) {
-            VkTensorDescriptionKHR *td = deep_copy_tensor_desc(
-                pBindings[i].pTensorDescription, pAllocator);
+            VkTensorDescriptionKHR *td =
+                deep_copy_tensor_desc(pBindings[i].pTensorDescription, pAllocator);
             if (!td) {
                 for (uint32_t j = 0; j < i; j++)
                     free_binding_deep_data(&dst[j], pAllocator);
@@ -228,8 +215,7 @@ static VkMLTensorBindingKHR *deep_copy_bindings(
     return dst;
 }
 
-static char *deep_copy_string(const char *str,
-                              const VkAllocationCallbacks *pAllocator)
+static char *deep_copy_string(const char *str, const VkAllocationCallbacks *pAllocator)
 {
     if (!str)
         return NULL;
@@ -247,8 +233,7 @@ static void free_node_deep_data(VkMLGraphNodeCreateInfoKHR *node,
     if (!node)
         return;
     if (node->pOperationDesc) {
-        uint32_t desc_stype =
-            *(const uint32_t *)node->pOperationDesc;
+        uint32_t desc_stype = *(const uint32_t *)node->pOperationDesc;
         if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR) {
             VkMLPrimitiveDescReshapeKHR *reshape =
                 (VkMLPrimitiveDescReshapeKHR *)node->pOperationDesc;
@@ -265,15 +250,13 @@ static void free_node_deep_data(VkMLGraphNodeCreateInfoKHR *node,
 
     if (node->pInputs) {
         for (uint32_t i = 0; i < node->inputCount; i++)
-            free_binding_deep_data(
-                (VkMLTensorBindingKHR *)&node->pInputs[i], pAllocator);
+            free_binding_deep_data((VkMLTensorBindingKHR *)&node->pInputs[i], pAllocator);
         vk_ml_free(pAllocator, (void *)node->pInputs);
         node->pInputs = NULL;
     }
     if (node->pOutputs) {
         for (uint32_t i = 0; i < node->outputCount; i++)
-            free_binding_deep_data(
-                (VkMLTensorBindingKHR *)&node->pOutputs[i], pAllocator);
+            free_binding_deep_data((VkMLTensorBindingKHR *)&node->pOutputs[i], pAllocator);
         vk_ml_free(pAllocator, (void *)node->pOutputs);
         node->pOutputs = NULL;
     }
@@ -285,8 +268,7 @@ static void free_node_deep_data(VkMLGraphNodeCreateInfoKHR *node,
 /* Graph cleanup helper (goto pattern)                                */
 /* ------------------------------------------------------------------ */
 
-static void free_graph_internals(VkMLGraphKHR_T *g,
-                                 const VkAllocationCallbacks *pAllocator)
+static void free_graph_internals(VkMLGraphKHR_T *g, const VkAllocationCallbacks *pAllocator)
 {
     if (!g)
         return;
@@ -316,11 +298,10 @@ static void free_graph_internals(VkMLGraphKHR_T *g,
 /* ML graph creation and destruction                                  */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
-    VkDevice                         device,
-    const VkMLGraphCreateInfoKHR*    pCreateInfo,
-    const VkAllocationCallbacks*     pAllocator,
-    VkMLGraphKHR*                    pGraph)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(VkDevice device,
+                                                  const VkMLGraphCreateInfoKHR *pCreateInfo,
+                                                  const VkAllocationCallbacks *pAllocator,
+                                                  VkMLGraphKHR *pGraph)
 {
     (void)device;
     if (!pCreateInfo || !pGraph)
@@ -335,14 +316,12 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
     for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
         const VkMLGraphNodeCreateInfoKHR *node = &pCreateInfo->pNodes[i];
         if (node->pOperationDesc) {
-            if (!vk_ml_validate_primitive_desc(node->operationType,
-                                               node->pOperationDesc))
+            if (!vk_ml_validate_primitive_desc(node->operationType, node->pOperationDesc))
                 return VK_ERROR_UNKNOWN;
         }
     }
 
-    VkMLGraphKHR_T *graph = (VkMLGraphKHR_T *)vk_ml_alloc(pAllocator,
-        sizeof(VkMLGraphKHR_T));
+    VkMLGraphKHR_T *graph = (VkMLGraphKHR_T *)vk_ml_alloc(pAllocator, sizeof(VkMLGraphKHR_T));
     if (!graph)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
@@ -356,11 +335,13 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
 
     /* Deep-copy nodes with all their pointer members */
     if (pCreateInfo->nodeCount > 0 && pCreateInfo->pNodes) {
-        graph->nodes = (VkMLGraphNodeCreateInfoKHR *)vk_ml_alloc(pAllocator,
-            pCreateInfo->nodeCount * sizeof(VkMLGraphNodeCreateInfoKHR));
-        if (!graph->nodes) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
-        memset(graph->nodes, 0,
-            pCreateInfo->nodeCount * sizeof(VkMLGraphNodeCreateInfoKHR));
+        graph->nodes = (VkMLGraphNodeCreateInfoKHR *)vk_ml_alloc(
+            pAllocator, pCreateInfo->nodeCount * sizeof(VkMLGraphNodeCreateInfoKHR));
+        if (!graph->nodes) {
+            result = VK_ERROR_OUT_OF_HOST_MEMORY;
+            goto cleanup;
+        }
+        memset(graph->nodes, 0, pCreateInfo->nodeCount * sizeof(VkMLGraphNodeCreateInfoKHR));
 
         for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
             const VkMLGraphNodeCreateInfoKHR *src = &pCreateInfo->pNodes[i];
@@ -374,24 +355,21 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
             dst->pNodeName = NULL;
 
             if (src->pOperationDesc) {
-                dst->pOperationDesc = deep_copy_op_desc(src->pOperationDesc,
-                                                        pAllocator);
+                dst->pOperationDesc = deep_copy_op_desc(src->pOperationDesc, pAllocator);
                 if (!dst->pOperationDesc) {
                     result = VK_ERROR_OUT_OF_HOST_MEMORY;
                     goto cleanup;
                 }
             }
             if (src->inputCount > 0 && src->pInputs) {
-                dst->pInputs = deep_copy_bindings(src->pInputs,
-                                                  src->inputCount, pAllocator);
+                dst->pInputs = deep_copy_bindings(src->pInputs, src->inputCount, pAllocator);
                 if (!dst->pInputs) {
                     result = VK_ERROR_OUT_OF_HOST_MEMORY;
                     goto cleanup;
                 }
             }
             if (src->outputCount > 0 && src->pOutputs) {
-                dst->pOutputs = deep_copy_bindings(src->pOutputs,
-                                                   src->outputCount, pAllocator);
+                dst->pOutputs = deep_copy_bindings(src->pOutputs, src->outputCount, pAllocator);
                 if (!dst->pOutputs) {
                     result = VK_ERROR_OUT_OF_HOST_MEMORY;
                     goto cleanup;
@@ -408,59 +386,59 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
     }
 
     /* Deep-copy external input descriptions */
-    if (pCreateInfo->externalInputCount > 0 &&
-        pCreateInfo->pExternalInputDescriptions) {
+    if (pCreateInfo->externalInputCount > 0 && pCreateInfo->pExternalInputDescriptions) {
         graph->externalInputDescs = (VkTensorDescriptionKHR *)vk_ml_alloc(
-            pAllocator,
-            pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
+            pAllocator, pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
         if (!graph->externalInputDescs) {
-            result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
+            result = VK_ERROR_OUT_OF_HOST_MEMORY;
+            goto cleanup;
         }
         memset(graph->externalInputDescs, 0,
-            pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
+               pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalInputCount; i++) {
-            result = deep_copy_tensor_desc_into(
-                &graph->externalInputDescs[i],
-                &pCreateInfo->pExternalInputDescriptions[i], pAllocator);
-            if (result != VK_SUCCESS) goto cleanup;
+            result =
+                deep_copy_tensor_desc_into(&graph->externalInputDescs[i],
+                                           &pCreateInfo->pExternalInputDescriptions[i], pAllocator);
+            if (result != VK_SUCCESS)
+                goto cleanup;
         }
     }
 
     /* Deep-copy external output descriptions */
-    if (pCreateInfo->externalOutputCount > 0 &&
-        pCreateInfo->pExternalOutputDescriptions) {
+    if (pCreateInfo->externalOutputCount > 0 && pCreateInfo->pExternalOutputDescriptions) {
         graph->externalOutputDescs = (VkTensorDescriptionKHR *)vk_ml_alloc(
-            pAllocator,
-            pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
+            pAllocator, pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
         if (!graph->externalOutputDescs) {
-            result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
+            result = VK_ERROR_OUT_OF_HOST_MEMORY;
+            goto cleanup;
         }
         memset(graph->externalOutputDescs, 0,
-            pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
+               pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalOutputCount; i++) {
-            result = deep_copy_tensor_desc_into(
-                &graph->externalOutputDescs[i],
-                &pCreateInfo->pExternalOutputDescriptions[i], pAllocator);
-            if (result != VK_SUCCESS) goto cleanup;
+            result = deep_copy_tensor_desc_into(&graph->externalOutputDescs[i],
+                                                &pCreateInfo->pExternalOutputDescriptions[i],
+                                                pAllocator);
+            if (result != VK_SUCCESS)
+                goto cleanup;
         }
     }
 
     /* Deep-copy constant weight descriptions */
-    if (pCreateInfo->constantWeightCount > 0 &&
-        pCreateInfo->pConstantWeightDescriptions) {
+    if (pCreateInfo->constantWeightCount > 0 && pCreateInfo->pConstantWeightDescriptions) {
         graph->constantWeightDescs = (VkTensorDescriptionKHR *)vk_ml_alloc(
-            pAllocator,
-            pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
+            pAllocator, pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
         if (!graph->constantWeightDescs) {
-            result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
+            result = VK_ERROR_OUT_OF_HOST_MEMORY;
+            goto cleanup;
         }
         memset(graph->constantWeightDescs, 0,
-            pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
+               pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->constantWeightCount; i++) {
-            result = deep_copy_tensor_desc_into(
-                &graph->constantWeightDescs[i],
-                &pCreateInfo->pConstantWeightDescriptions[i], pAllocator);
-            if (result != VK_SUCCESS) goto cleanup;
+            result = deep_copy_tensor_desc_into(&graph->constantWeightDescs[i],
+                                                &pCreateInfo->pConstantWeightDescriptions[i],
+                                                pAllocator);
+            if (result != VK_SUCCESS)
+                goto cleanup;
         }
     }
 
@@ -485,10 +463,8 @@ cleanup:
     return result;
 }
 
-VKAPI_ATTR void VKAPI_CALL vkDestroyMLGraphKHR(
-    VkDevice                        device,
-    VkMLGraphKHR                    graph,
-    const VkAllocationCallbacks*    pAllocator)
+VKAPI_ATTR void VKAPI_CALL vkDestroyMLGraphKHR(VkDevice device, VkMLGraphKHR graph,
+                                               const VkAllocationCallbacks *pAllocator)
 {
     (void)device;
     if (graph == VK_NULL_HANDLE)
@@ -504,9 +480,7 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyMLGraphKHR(
 /* ------------------------------------------------------------------ */
 
 VKAPI_ATTR void VKAPI_CALL vkGetMLGraphMemoryRequirementsKHR(
-    VkDevice                device,
-    VkMLGraphKHR            graph,
-    VkMemoryRequirements2*  pMemoryRequirements)
+    VkDevice device, VkMLGraphKHR graph, VkMemoryRequirements2 *pMemoryRequirements)
 {
     (void)device;
     if (!pMemoryRequirements || graph == VK_NULL_HANDLE)

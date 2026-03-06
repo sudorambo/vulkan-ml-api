@@ -9,11 +9,10 @@
 /* Tensor view creation and destruction                               */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(
-    VkDevice                            device,
-    const VkTensorViewCreateInfoKHR*    pCreateInfo,
-    const VkAllocationCallbacks*        pAllocator,
-    VkTensorViewKHR*                    pView)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(VkDevice device,
+                                                     const VkTensorViewCreateInfoKHR *pCreateInfo,
+                                                     const VkAllocationCallbacks *pAllocator,
+                                                     VkTensorViewKHR *pView)
 {
     (void)device;
     if (!pCreateInfo || !pView)
@@ -23,7 +22,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(
     if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR)
         return VK_ERROR_UNKNOWN;
 
-    VkTensorViewKHR_T* view = (VkTensorViewKHR_T*)vk_ml_alloc(pAllocator, sizeof(VkTensorViewKHR_T));
+    VkTensorViewKHR_T *view =
+        (VkTensorViewKHR_T *)vk_ml_alloc(pAllocator, sizeof(VkTensorViewKHR_T));
     if (!view)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
@@ -35,25 +35,25 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(
 
     if (pCreateInfo->dimensionCount > 0) {
         if (pCreateInfo->pDimensionOffsets) {
-            view->dimensionOffsets = (uint32_t*)vk_ml_alloc(pAllocator,
-                pCreateInfo->dimensionCount * sizeof(uint32_t));
+            view->dimensionOffsets =
+                (uint32_t *)vk_ml_alloc(pAllocator, pCreateInfo->dimensionCount * sizeof(uint32_t));
             if (!view->dimensionOffsets) {
                 vk_ml_free(pAllocator, view);
                 return VK_ERROR_OUT_OF_HOST_MEMORY;
             }
             memcpy(view->dimensionOffsets, pCreateInfo->pDimensionOffsets,
-                pCreateInfo->dimensionCount * sizeof(uint32_t));
+                   pCreateInfo->dimensionCount * sizeof(uint32_t));
         }
         if (pCreateInfo->pDimensionSizes) {
-            view->dimensionSizes = (uint32_t*)vk_ml_alloc(pAllocator,
-                pCreateInfo->dimensionCount * sizeof(uint32_t));
+            view->dimensionSizes =
+                (uint32_t *)vk_ml_alloc(pAllocator, pCreateInfo->dimensionCount * sizeof(uint32_t));
             if (!view->dimensionSizes) {
                 vk_ml_free(pAllocator, view->dimensionOffsets);
                 vk_ml_free(pAllocator, view);
                 return VK_ERROR_OUT_OF_HOST_MEMORY;
             }
             memcpy(view->dimensionSizes, pCreateInfo->pDimensionSizes,
-                pCreateInfo->dimensionCount * sizeof(uint32_t));
+                   pCreateInfo->dimensionCount * sizeof(uint32_t));
         }
     }
 
@@ -61,16 +61,14 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(
     return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL vkDestroyTensorViewKHR(
-    VkDevice                        device,
-    VkTensorViewKHR                 view,
-    const VkAllocationCallbacks*    pAllocator)
+VKAPI_ATTR void VKAPI_CALL vkDestroyTensorViewKHR(VkDevice device, VkTensorViewKHR view,
+                                                  const VkAllocationCallbacks *pAllocator)
 {
     (void)device;
     if (view == VK_NULL_HANDLE)
         return;
 
-    VkTensorViewKHR_T* v = (VkTensorViewKHR_T*)(uintptr_t)view;
+    VkTensorViewKHR_T *v = (VkTensorViewKHR_T *)(uintptr_t)view;
     vk_ml_free(pAllocator, v->dimensionOffsets);
     vk_ml_free(pAllocator, v->dimensionSizes);
     vk_ml_free(pAllocator, v);

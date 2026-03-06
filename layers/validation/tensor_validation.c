@@ -3,15 +3,14 @@
  * @brief Tensor-related validation for VK_KHR_ml_primitives.
  */
 
-#include "vk_ml_validation.h"
 #include "internal.h"
+#include "vk_ml_validation.h"
 
 #include <stddef.h>
 
-VkBool32 vk_ml_validate_tensor_create(
-    const VkTensorCreateInfoKHR *pCreateInfo,
-    const VkPhysicalDeviceMLFeaturesKHR *features,
-    const VkPhysicalDeviceMLPropertiesKHR *props)
+VkBool32 vk_ml_validate_tensor_create(const VkTensorCreateInfoKHR *pCreateInfo,
+                                      const VkPhysicalDeviceMLFeaturesKHR *features,
+                                      const VkPhysicalDeviceMLPropertiesKHR *props)
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
@@ -86,9 +85,8 @@ VkBool32 vk_ml_validate_tensor_create(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_tensor_view_create(
-    const VkTensorViewCreateInfoKHR *pCreateInfo,
-    const struct VkTensorKHR_T *tensor)
+VkBool32 vk_ml_validate_tensor_view_create(const VkTensorViewCreateInfoKHR *pCreateInfo,
+                                           const struct VkTensorKHR_T *tensor)
 {
     if (!pCreateInfo || !tensor)
         return VK_FALSE;
@@ -117,17 +115,17 @@ VkBool32 vk_ml_validate_tensor_view_create(
         if (pCreateInfo->pDimensionSizes[i] == 0)
             return VK_FALSE;
         if (pCreateInfo->pDimensionSizes[i] > tensor->dimensions[i] ||
-            pCreateInfo->pDimensionOffsets[i] > tensor->dimensions[i] - pCreateInfo->pDimensionSizes[i])
+            pCreateInfo->pDimensionOffsets[i] >
+                tensor->dimensions[i] - pCreateInfo->pDimensionSizes[i])
             return VK_FALSE;
     }
 
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_tensor_bind(
-    const VkBindTensorMemoryInfoKHR *pBindInfo,
-    const struct VkTensorKHR_T *tensor,
-    const VkPhysicalDeviceMLPropertiesKHR *props)
+VkBool32 vk_ml_validate_tensor_bind(const VkBindTensorMemoryInfoKHR *pBindInfo,
+                                    const struct VkTensorKHR_T *tensor,
+                                    const VkPhysicalDeviceMLPropertiesKHR *props)
 {
     if (!pBindInfo || !tensor || !props)
         return VK_FALSE;
@@ -150,8 +148,7 @@ VkBool32 vk_ml_validate_tensor_bind(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_tensor_copy(
-    const VkCopyTensorInfoKHR *pCopyInfo)
+VkBool32 vk_ml_validate_tensor_copy(const VkCopyTensorInfoKHR *pCopyInfo)
 {
     if (!pCopyInfo)
         return VK_FALSE;

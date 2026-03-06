@@ -3,18 +3,16 @@
  * @brief ML graph and primitive descriptor validation for VK_KHR_ml_primitives.
  */
 
-#include "vk_ml_validation.h"
 #include "internal.h"
+#include "vk_ml_validation.h"
 
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-static VkBool32 dfs_has_cycle(uint32_t node,
-                              const VkMLGraphNodeCreateInfoKHR *nodes,
-                              uint32_t nodeCount,
-                              uint8_t *color)
+static VkBool32 dfs_has_cycle(uint32_t node, const VkMLGraphNodeCreateInfoKHR *nodes,
+                              uint32_t nodeCount, uint8_t *color)
 {
     color[node] = 1; /* GRAY - in progress */
     for (uint32_t i = 0; i < nodes[node].inputCount; i++) {
@@ -35,10 +33,9 @@ static VkBool32 dfs_has_cycle(uint32_t node,
     return VK_FALSE;
 }
 
-VkBool32 vk_ml_validate_graph_create(
-    const VkMLGraphCreateInfoKHR *pCreateInfo,
-    const VkPhysicalDeviceMLFeaturesKHR *features,
-    const VkPhysicalDeviceMLPropertiesKHR *props)
+VkBool32 vk_ml_validate_graph_create(const VkMLGraphCreateInfoKHR *pCreateInfo,
+                                     const VkPhysicalDeviceMLFeaturesKHR *features,
+                                     const VkPhysicalDeviceMLPropertiesKHR *props)
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
@@ -70,8 +67,7 @@ VkBool32 vk_ml_validate_graph_create(
         return VK_FALSE;
     memset(color, 0, pCreateInfo->nodeCount * sizeof(uint8_t));
     for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
-        if (color[i] == 0 && dfs_has_cycle(i, pCreateInfo->pNodes,
-                                            pCreateInfo->nodeCount, color)) {
+        if (color[i] == 0 && dfs_has_cycle(i, pCreateInfo->pNodes, pCreateInfo->nodeCount, color)) {
             free(color);
             return VK_FALSE;
         }
@@ -92,8 +88,8 @@ VkBool32 vk_ml_validate_graph_create(
                 return VK_FALSE;
             break;
         case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR:
-            if (!vk_ml_validate_gemm_desc(
-                    (const VkMLPrimitiveDescGemmKHR *)node->pOperationDesc, &feat_copy))
+            if (!vk_ml_validate_gemm_desc((const VkMLPrimitiveDescGemmKHR *)node->pOperationDesc,
+                                          &feat_copy))
                 return VK_FALSE;
             break;
         case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR:
@@ -144,9 +140,8 @@ VkBool32 vk_ml_validate_graph_create(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_convolution_desc(
-    const VkMLPrimitiveDescConvolutionKHR *desc,
-    const VkPhysicalDeviceMLFeaturesKHR *features)
+VkBool32 vk_ml_validate_convolution_desc(const VkMLPrimitiveDescConvolutionKHR *desc,
+                                         const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!desc || !features)
         return VK_FALSE;
@@ -167,14 +162,13 @@ VkBool32 vk_ml_validate_convolution_desc(
 
     /* VUID_CONV_PADDING - padding fields must be 0 when not EXPLICIT */
     if (desc->paddingMode != VK_ML_PADDING_MODE_EXPLICIT_KHR) {
-        if (desc->paddingTop != 0 || desc->paddingBottom != 0 ||
-            desc->paddingLeft != 0 || desc->paddingRight != 0)
+        if (desc->paddingTop != 0 || desc->paddingBottom != 0 || desc->paddingLeft != 0 ||
+            desc->paddingRight != 0)
             return VK_FALSE;
     }
 
     /* VUID_CONV_FUSED_ACT */
-    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR &&
-        !features->fusedActivations)
+    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR && !features->fusedActivations)
         return VK_FALSE;
 
     /* VUID_CONV_GROUP_COUNT */
@@ -186,9 +180,8 @@ VkBool32 vk_ml_validate_convolution_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_gemm_desc(
-    const VkMLPrimitiveDescGemmKHR *desc,
-    const VkPhysicalDeviceMLFeaturesKHR *features)
+VkBool32 vk_ml_validate_gemm_desc(const VkMLPrimitiveDescGemmKHR *desc,
+                                  const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!desc || !features)
         return VK_FALSE;
@@ -204,8 +197,7 @@ VkBool32 vk_ml_validate_gemm_desc(
         return VK_FALSE;
 
     /* VUID_GEMM_FUSED_ACT */
-    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR &&
-        !features->fusedActivations)
+    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR && !features->fusedActivations)
         return VK_FALSE;
 
     /* VUID_GEMM_DIMS - requires tensor shape analysis; stub */
@@ -214,8 +206,7 @@ VkBool32 vk_ml_validate_gemm_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_pooling_desc(
-    const VkMLPrimitiveDescPoolingKHR *desc)
+VkBool32 vk_ml_validate_pooling_desc(const VkMLPrimitiveDescPoolingKHR *desc)
 {
     if (!desc)
         return VK_FALSE;
@@ -245,9 +236,8 @@ VkBool32 vk_ml_validate_pooling_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_normalization_desc(
-    const VkMLPrimitiveDescNormalizationKHR *desc,
-    const VkPhysicalDeviceMLFeaturesKHR *features)
+VkBool32 vk_ml_validate_normalization_desc(const VkMLPrimitiveDescNormalizationKHR *desc,
+                                           const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!desc || !features)
         return VK_FALSE;
@@ -268,16 +258,14 @@ VkBool32 vk_ml_validate_normalization_desc(
     }
 
     /* VUID_NORM_FUSED_ACT */
-    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR &&
-        !features->fusedActivations)
+    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR && !features->fusedActivations)
         return VK_FALSE;
 
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_elementwise_desc(
-    const VkMLPrimitiveDescElementwiseKHR *desc,
-    const VkPhysicalDeviceMLFeaturesKHR *features)
+VkBool32 vk_ml_validate_elementwise_desc(const VkMLPrimitiveDescElementwiseKHR *desc,
+                                         const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!desc || !features)
         return VK_FALSE;
@@ -294,15 +282,13 @@ VkBool32 vk_ml_validate_elementwise_desc(
     }
 
     /* VUID_ELEM_FUSED_ACT */
-    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR &&
-        !features->fusedActivations)
+    if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR && !features->fusedActivations)
         return VK_FALSE;
 
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_activation_desc(
-    const VkMLPrimitiveDescActivationKHR *desc)
+VkBool32 vk_ml_validate_activation_desc(const VkMLPrimitiveDescActivationKHR *desc)
 {
     if (!desc)
         return VK_FALSE;
@@ -312,15 +298,13 @@ VkBool32 vk_ml_validate_activation_desc(
     if ((uint32_t)desc->activationType > VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR)
         return VK_FALSE;
 
-    if (desc->activationType == VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR &&
-        desc->param0 > desc->param1)
+    if (desc->activationType == VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR && desc->param0 > desc->param1)
         return VK_FALSE;
 
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_concat_desc(
-    const VkMLPrimitiveDescConcatKHR *desc)
+VkBool32 vk_ml_validate_concat_desc(const VkMLPrimitiveDescConcatKHR *desc)
 {
     if (!desc)
         return VK_FALSE;
@@ -330,8 +314,7 @@ VkBool32 vk_ml_validate_concat_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_reshape_desc(
-    const VkMLPrimitiveDescReshapeKHR *desc)
+VkBool32 vk_ml_validate_reshape_desc(const VkMLPrimitiveDescReshapeKHR *desc)
 {
     if (!desc)
         return VK_FALSE;
@@ -344,8 +327,7 @@ VkBool32 vk_ml_validate_reshape_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_transpose_desc(
-    const VkMLPrimitiveDescTransposeKHR *desc)
+VkBool32 vk_ml_validate_transpose_desc(const VkMLPrimitiveDescTransposeKHR *desc)
 {
     if (!desc)
         return VK_FALSE;
@@ -358,8 +340,7 @@ VkBool32 vk_ml_validate_transpose_desc(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_resize_desc(
-    const VkMLPrimitiveDescResizeKHR *desc)
+VkBool32 vk_ml_validate_resize_desc(const VkMLPrimitiveDescResizeKHR *desc)
 {
     if (!desc)
         return VK_FALSE;

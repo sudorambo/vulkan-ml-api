@@ -12,9 +12,8 @@
 /* ML graph dispatch command                                         */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR void VKAPI_CALL vkCmdDispatchMLGraphKHR(
-    VkCommandBuffer                     commandBuffer,
-    const VkMLGraphDispatchInfoKHR*     pDispatchInfo)
+VKAPI_ATTR void VKAPI_CALL vkCmdDispatchMLGraphKHR(VkCommandBuffer commandBuffer,
+                                                   const VkMLGraphDispatchInfoKHR *pDispatchInfo)
 {
     if (!commandBuffer || !pDispatchInfo)
         return;

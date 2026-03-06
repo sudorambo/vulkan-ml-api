@@ -9,11 +9,10 @@
 /* ML session creation and destruction                                */
 /* ------------------------------------------------------------------ */
 
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
-    VkDevice                           device,
-    const VkMLSessionCreateInfoKHR*    pCreateInfo,
-    const VkAllocationCallbacks*       pAllocator,
-    VkMLSessionKHR*                    pSession)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(VkDevice device,
+                                                    const VkMLSessionCreateInfoKHR *pCreateInfo,
+                                                    const VkAllocationCallbacks *pAllocator,
+                                                    VkMLSessionKHR *pSession)
 {
     (void)device;
     if (!pCreateInfo || !pSession)
@@ -28,8 +27,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
             return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    VkMLSessionKHR_T *session = (VkMLSessionKHR_T *)vk_ml_alloc(pAllocator,
-        sizeof(VkMLSessionKHR_T));
+    VkMLSessionKHR_T *session =
+        (VkMLSessionKHR_T *)vk_ml_alloc(pAllocator, sizeof(VkMLSessionKHR_T));
     if (!session)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
@@ -64,10 +63,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
     return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL vkDestroyMLSessionKHR(
-    VkDevice                        device,
-    VkMLSessionKHR                  session,
-    const VkAllocationCallbacks*    pAllocator)
+VKAPI_ATTR void VKAPI_CALL vkDestroyMLSessionKHR(VkDevice device, VkMLSessionKHR session,
+                                                 const VkAllocationCallbacks *pAllocator)
 {
     (void)device;
     if (session == VK_NULL_HANDLE)

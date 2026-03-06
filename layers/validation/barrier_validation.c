@@ -7,15 +7,11 @@
 
 /* Valid access mask bits for tensor memory barriers */
 static const VkAccessFlags2 VALID_TENSOR_ACCESS_MASK =
-    VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR |
-    VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR |
-    VK_ACCESS_2_SHADER_READ_BIT |
-    VK_ACCESS_2_SHADER_WRITE_BIT |
-    VK_ACCESS_2_TRANSFER_READ_BIT |
+    VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR | VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR |
+    VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_READ_BIT |
     VK_ACCESS_2_TRANSFER_WRITE_BIT;
 
-VkBool32 vk_ml_validate_tensor_memory_barrier(
-    const VkTensorMemoryBarrierKHR *barrier)
+VkBool32 vk_ml_validate_tensor_memory_barrier(const VkTensorMemoryBarrierKHR *barrier)
 {
     if (!barrier)
         return VK_FALSE;
@@ -41,8 +37,7 @@ VkBool32 vk_ml_validate_tensor_memory_barrier(
     return VK_TRUE;
 }
 
-VkBool32 vk_ml_validate_tensor_dependency_info(
-    const VkTensorDependencyInfoKHR *depInfo)
+VkBool32 vk_ml_validate_tensor_dependency_info(const VkTensorDependencyInfoKHR *depInfo)
 {
     if (!depInfo)
         return VK_FALSE;
@@ -56,8 +51,7 @@ VkBool32 vk_ml_validate_tensor_dependency_info(
         return VK_FALSE;
 
     for (uint32_t i = 0; i < depInfo->tensorMemoryBarrierCount; i++) {
-        if (!vk_ml_validate_tensor_memory_barrier(
-                &depInfo->pTensorMemoryBarriers[i]))
+        if (!vk_ml_validate_tensor_memory_barrier(&depInfo->pTensorMemoryBarriers[i]))
             return VK_FALSE;
     }
 

@@ -7,8 +7,7 @@
 
 #include <stddef.h>
 
-VkBool32 vk_ml_validate_dispatch(
-    const VkMLGraphDispatchInfoKHR *pDispatchInfo)
+VkBool32 vk_ml_validate_dispatch(const VkMLGraphDispatchInfoKHR *pDispatchInfo)
 {
     if (!pDispatchInfo)
         return VK_FALSE;
