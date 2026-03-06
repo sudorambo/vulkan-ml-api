@@ -338,9 +338,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L10 — Self-referencing include paths in validation files
 
-- [ ] [P] **Files**: `layers/validation/tensor_validation.c:6`, `layers/validation/graph_validation.c:6`
+- [x] [P] **Files**: `layers/validation/tensor_validation.c:6`, `layers/validation/graph_validation.c:6`
 - **Description**: `"../validation/vk_ml_validation.h"` from within `layers/validation/` is redundant.
 - **Fix**: Change to `"vk_ml_validation.h"`.
+- **FIXED**: Phase 46 (T211-T216). Changed all 5 validation files (`tensor_validation.c`, `graph_validation.c`, `session_validation.c`, `dispatch_validation.c`, `barrier_validation.c`) to use `"vk_ml_validation.h"`. All 13 tests pass.
 
 ### L11 — Resource leak in quickstart on partial tensor creation failure
 

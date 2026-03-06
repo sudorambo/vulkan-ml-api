@@ -3,7 +3,7 @@
  * @brief ML graph dispatch validation for VK_KHR_ml_primitives.
  */
 
-#include "../validation/vk_ml_validation.h"
+#include "vk_ml_validation.h"
 
 #include <stddef.h>
 

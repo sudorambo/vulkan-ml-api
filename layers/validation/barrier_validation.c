@@ -3,7 +3,7 @@
  * @brief Tensor memory barrier validation for VK_KHR_ml_primitives.
  */
 
-#include "../validation/vk_ml_validation.h"
+#include "vk_ml_validation.h"
 
 /* Valid access mask bits for tensor memory barriers */
 static const VkAccessFlags2 VALID_TENSOR_ACCESS_MASK =

@@ -1652,6 +1652,37 @@ Total: 3 tasks.
 
 ---
 
+### Phase 46: Review Remediation — L10 (Self-referencing include paths in validation files)
+
+**Goal**: Replace redundant `"../validation/vk_ml_validation.h"` with `"vk_ml_validation.h"` in all validation source files.
+
+- [X] T211 [P] In `layers/validation/tensor_validation.c`, change `#include "../validation/vk_ml_validation.h"` to `#include "vk_ml_validation.h"`.
+
+- [X] T212 [P] In `layers/validation/graph_validation.c`, change `#include "../validation/vk_ml_validation.h"` to `#include "vk_ml_validation.h"`.
+
+- [X] T213 [P] In `layers/validation/session_validation.c`, change `#include "../validation/vk_ml_validation.h"` to `#include "vk_ml_validation.h"`.
+
+- [X] T214 [P] In `layers/validation/dispatch_validation.c`, change `#include "../validation/vk_ml_validation.h"` to `#include "vk_ml_validation.h"`.
+
+- [X] T215 [P] In `layers/validation/barrier_validation.c`, change `#include "../validation/vk_ml_validation.h"` to `#include "vk_ml_validation.h"`.
+
+- [X] T216 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: All validation source files use same-directory include for `vk_ml_validation.h`.
+
+---
+
+### Phase 46 Dependencies
+
+```text
+T211, T212, T213, T214, T215 — parallel [P] (different files)
+T216 — depends on T211–T215
+
+Total: 6 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
