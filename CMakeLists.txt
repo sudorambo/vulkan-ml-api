@@ -74,6 +74,7 @@ set(CTS_TESTS
     tests/cts/test_ml_dispatch.c
     tests/cts/test_synchronization.c
     tests/cts/test_spirv_tensor.c
+    tests/cts/test_oom.c
 )
 
 foreach(test_src ${CTS_TESTS})

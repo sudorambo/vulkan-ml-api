@@ -104,7 +104,7 @@ The build produces two static libraries:
 cd build && ctest --output-on-failure
 ```
 
-The test suite includes 12 executables:
+The test suite includes 13 executables:
 
 | Suite | Type | Coverage |
 |-------|------|----------|
@@ -119,6 +119,7 @@ The test suite includes 12 executables:
 | test\_spirv\_tensor | CTS | SPIR-V tensor read/write/query operations |
 | test\_vuids | Validation | Negative tests for all Valid Usage IDs |
 | test\_dag\_validation | Unit | DAG cycle detection, topological ordering |
+| test\_oom | CTS | OOM (allocation failure) paths for all create functions |
 | test\_descriptor\_validation | Unit | ML primitive descriptor parameter checks |
 
 ## Quick Start

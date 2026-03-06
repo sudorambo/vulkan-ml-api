@@ -313,6 +313,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         if (!graph->externalInputDescs) {
             result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
         }
+        memset(graph->externalInputDescs, 0,
+            pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalInputCount; i++) {
             VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
                 &pCreateInfo->pExternalInputDescriptions[i], pAllocator);
@@ -331,6 +333,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         if (!graph->externalOutputDescs) {
             result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
         }
+        memset(graph->externalOutputDescs, 0,
+            pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalOutputCount; i++) {
             VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
                 &pCreateInfo->pExternalOutputDescriptions[i], pAllocator);
@@ -349,6 +353,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         if (!graph->constantWeightDescs) {
             result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup;
         }
+        memset(graph->constantWeightDescs, 0,
+            pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->constantWeightCount; i++) {
             VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
                 &pCreateInfo->pConstantWeightDescriptions[i], pAllocator);

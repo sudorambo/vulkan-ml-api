@@ -107,9 +107,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H8 — No OOM / allocation-failure tests
 
-- [ ] [P] **File**: all CTS tests
+- [x] **File**: `tests/cts/test_oom.c`
 - **Description**: No CTS test exercises `VK_ERROR_OUT_OF_HOST_MEMORY` return paths. The reference implementation always succeeds unless input validation fails.
 - **Fix**: Add tests using a custom `VkAllocationCallbacks` that returns NULL after N allocations. Verify create functions return `VK_ERROR_OUT_OF_HOST_MEMORY` and don't leak partially-allocated resources.
+- **FIXED**: Phase 19 (T125-T127). Created `test_oom.c` with a failing allocator that returns NULL after N allocations. 4 test functions cover all OOM paths in `vkCreateTensorKHR` (4 points), `vkCreateTensorViewKHR` (3 points), `vkCreateMLGraphKHR` (15+ points via ascending loop), and `vkCreateMLSessionKHR` (1 point). **Bonus**: OOM tests uncovered a real bug — uninitialized descriptor arrays in `vkCreateMLGraphKHR`'s cleanup path caused double-free on partial allocation failure. Fixed by zero-initializing `externalInputDescs`, `externalOutputDescs`, and `constantWeightDescs` arrays after allocation.
 
 ### H9 — Tautological tests that can never fail
 

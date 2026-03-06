@@ -791,6 +791,58 @@ Total: 2 tasks. Sequential.
 
 ---
 
+## Phase 19: Review Remediation — H8 (OOM / Allocation-Failure Tests)
+
+**Goal**: Add CTS tests exercising every `VK_ERROR_OUT_OF_HOST_MEMORY` return path in the four `vkCreate*` functions. Uses a custom `VkAllocationCallbacks` that returns `NULL` after N allocations to verify: (a) correct `VkResult`, (b) no partial-allocation leaks, (c) no partial object returned. Resolves HIGH finding H8 from `review-findings.md`.
+
+### Sub-phase 19a: Create OOM test suite
+
+- [X] T125 Create `tests/cts/test_oom.c` with the following contents:
+
+  1. **Failing allocator infrastructure**:
+     - Define `FailingAllocatorData` struct with fields: `uint32_t alloc_count` (incremented on each `pfnAllocation` call), `uint32_t fail_after` (return `NULL` when `alloc_count > fail_after`), `uint32_t free_count` (incremented on each `pfnFree` call).
+     - Implement `failing_alloc(void *pUserData, size_t size, size_t alignment, VkSystemAllocationScope scope)`: increment `alloc_count`; if `alloc_count > fail_after`, return `NULL`; otherwise call `aligned_alloc`/`malloc` normally.
+     - Implement `failing_free(void *pUserData, void *pMemory)`: if `pMemory` is non-NULL, increment `free_count` and call `free`.
+     - Implement `failing_realloc` as a stub that returns `NULL` (not used by implementation).
+     - Helper `make_failing_allocator(FailingAllocatorData *data)` returns a `VkAllocationCallbacks` struct wired to the above functions with `pUserData = data`.
+     - Helper `reset_failing_allocator(FailingAllocatorData *data, uint32_t fail_after)` zeroes all counters and sets `fail_after`.
+
+  2. **`test_tensor_create_oom`**: Set up a valid `VkTensorCreateInfoKHR` with `dimensionCount = 2`, `pDimensions`, `pStrides`, and `queueFamilyIndexCount = 1`. Loop `fail_after` from `0` to `3` (4 allocation points in `vkCreateTensorKHR`). For each iteration: reset the allocator, call `vkCreateTensorKHR`, assert return is `VK_ERROR_OUT_OF_HOST_MEMORY`, assert `free_count == alloc_count - 1` (all successful allocations freed), assert `pTensor` output handle was NOT modified from its sentinel value.
+
+  3. **`test_tensor_view_create_oom`**: Set up a valid `VkTensorViewCreateInfoKHR` with `dimensionCount = 2`, `pDimensionOffsets`, `pDimensionSizes`. Loop `fail_after` from `0` to `2` (3 allocation points in `vkCreateTensorViewKHR`). For each iteration: reset the allocator, call `vkCreateTensorViewKHR`, assert return is `VK_ERROR_OUT_OF_HOST_MEMORY`, assert `free_count == alloc_count - 1`, assert `pView` output handle was NOT modified.
+
+  4. **`test_graph_create_oom`**: Set up a valid `VkMLGraphCreateInfoKHR` with 1 node containing: `operationType = VK_ML_OPERATION_TYPE_ACTIVATION_KHR`, a valid `VkMLPrimitiveDescActivationKHR` as `pOperationDesc`, 1 input binding with a `VkTensorDescriptionKHR` (2 dims), 1 output binding with a `VkTensorDescriptionKHR` (2 dims), a `pNodeName`, plus 1 external input desc, 1 external output desc, 0 constant weights. Loop `fail_after` from `0` upward: reset allocator, call `vkCreateMLGraphKHR`; if result is `VK_SUCCESS`, destroy the graph and break (we've covered all OOM paths); otherwise assert result is `VK_ERROR_OUT_OF_HOST_MEMORY` and assert `free_count == alloc_count - 1`. Assert that the loop ran at least 5 iterations (proving multiple OOM points were exercised).
+
+  5. **`test_session_create_oom`**: Set up a valid `VkMLSessionCreateInfoKHR`. Set `fail_after = 0`. Call `vkCreateMLSessionKHR`, assert return is `VK_ERROR_OUT_OF_HOST_MEMORY`, assert `free_count == 0` (the single allocation failed, nothing to free), assert output handle was NOT modified.
+
+  6. **`main`** function: call all 4 test functions, print results, return 0 on all pass or 1 on failure.
+
+  Include headers: `<vulkan/vulkan_ml_primitives.h>`, `<stdio.h>`, `<stdlib.h>`, `<string.h>`, `<stdint.h>`.
+
+### Sub-phase 19b: Update CMakeLists.txt
+
+- [X] T126 In `CMakeLists.txt`, add `tests/cts/test_oom.c` to the `CTS_TESTS` list (after `test_spirv_tensor.c`).
+
+### Sub-phase 19c: Build + test verification
+
+- [X] T127 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. Verify the new `cts_test_oom` test appears and passes.
+
+**Checkpoint**: All four `vkCreate*` functions have OOM tests. Every allocation failure point returns `VK_ERROR_OUT_OF_HOST_MEMORY` without leaking partially-allocated resources.
+
+---
+
+### Phase 19 Dependencies
+
+```text
+Sub-phase 19a (test):    T125 — create test file
+Sub-phase 19b (cmake):   T126 — depends on T125
+Sub-phase 19c (verify):  T127 — depends on T125, T126
+
+Total: 3 tasks. Sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
