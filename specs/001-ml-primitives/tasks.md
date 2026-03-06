@@ -1338,6 +1338,26 @@ Total: 2 tasks.
 
 ---
 
+## Phase 34: Review Remediation — M14 (VUID coverage audit update)
+
+**Goal**: Update M14 in `review-findings.md` to reflect improved coverage (59% → 78%) after Phases 22-33. Categorize remaining gaps. No code changes — documentation only. Resolves MEDIUM finding M14 from `review-findings.md`.
+
+- [X] T174 Update M14 in `specs/001-ml-primitives/review-findings.md` to mark `[x] PARTIAL`. Replace description with updated coverage audit: 42/59 fully validated, 4 partial (78%). Categorize remaining 13 unvalidated VUIDs into: runtime-only (4), needs tensor object lookup (7), needs shape/graph context (5). Note these are deferred to a future phase requiring validation infrastructure expansion.
+
+**Checkpoint**: M14 reflects accurate current state. No code changes needed.
+
+---
+
+### Phase 34 Dependencies
+
+```text
+T174 — standalone (documentation only)
+
+Total: 1 task.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
