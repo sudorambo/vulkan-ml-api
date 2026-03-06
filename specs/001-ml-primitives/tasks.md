@@ -1450,6 +1450,34 @@ Total: 5 tasks. T183-T185 parallelizable.
 
 ---
 
+## Phase 38: Review Remediation — M18 (Missing test coverage for concurrent mode and linear tiling)
+
+**Goal**: Add CTS tests for `VK_SHARING_MODE_CONCURRENT` and `VK_TENSOR_TILING_LINEAR_KHR` with explicit strides. No ICD or validation changes. Resolves MEDIUM finding M18 from `review-findings.md`.
+
+- [X] T187 In `tests/cts/test_tensor_lifecycle.c`, add `test_tensor_concurrent_sharing`: create a tensor with `sharingMode = VK_SHARING_MODE_CONCURRENT`, `queueFamilyIndexCount = 2`, valid `pQueueFamilyIndices = {0, 1}`. Verify `vkCreateTensorKHR` returns `VK_SUCCESS`, bind memory, verify tensor is valid, destroy. Follow existing test pattern.
+
+- [X] T188 In `tests/cts/test_tensor_lifecycle.c`, add `test_tensor_linear_tiling_with_strides`: create a tensor with `tiling = VK_TENSOR_TILING_LINEAR_KHR`, dimensions `{2, 3, 4}`, explicit `pStrides` (row-major, element-size-aligned, e.g. `{48, 16, 4}` for fp32). Verify `vkCreateTensorKHR` returns `VK_SUCCESS`, bind memory, destroy. Follow existing test pattern.
+
+- [X] T189 Register both new tests with `RUN_TEST()` in the `main()` function of `tests/cts/test_tensor_lifecycle.c`.
+
+- [X] T190 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Concurrent sharing and linear tiling paths now tested. All 13 tests pass.
+
+---
+
+### Phase 38 Dependencies
+
+```text
+T187, T188 — sequential (same file)
+T189 — depends on T187, T188
+T190 — depends on T189
+
+Total: 4 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

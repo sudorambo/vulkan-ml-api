@@ -259,9 +259,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M18 — Missing test coverage for concurrent mode and linear tiling
 
-- [ ] [P] **Files**: CTS tests
+- [x] [P] **Files**: CTS tests
 - **Description**: All tensors use `VK_SHARING_MODE_EXCLUSIVE` and `VK_TENSOR_TILING_OPTIMAL_KHR`. Concurrent sharing mode and linear tiling with explicit strides are never tested.
 - **Fix**: Add tests for `VK_SHARING_MODE_CONCURRENT` with valid `queueFamilyIndexCount`/`pQueueFamilyIndices`, and `VK_TENSOR_TILING_LINEAR_KHR` with explicit strides.
+- **FIXED**: Phase 38 (T187-T190). Added `test_tensor_concurrent_sharing` (CONCURRENT mode, 2 queue families) and `test_tensor_linear_tiling_with_strides` (LINEAR tiling, row-major strides) to `test_tensor_lifecycle.c`. All 13 tests pass.
 
 ### M19 — No NULL pointer argument tests
 

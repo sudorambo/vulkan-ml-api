@@ -386,6 +386,100 @@ static int test_alloc_callback_alignment(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Concurrent sharing mode                                             */
+/* ------------------------------------------------------------------ */
+
+static int test_tensor_concurrent_sharing(void)
+{
+    uint32_t dims[] = {1, 3, 8, 8};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 4,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    uint32_t queueFamilies[] = {0, 1};
+    VkTensorCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_CONCURRENT,
+        .queueFamilyIndexCount = 2,
+        .pQueueFamilyIndices = queueFamilies,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &createInfo, NULL, &tensor);
+    if (r != VK_SUCCESS || tensor == VK_NULL_HANDLE)
+        return 1;
+
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = tensor,
+        .memory = (VkDeviceMemory)(uintptr_t)0x1,
+        .memoryOffset = 0,
+    };
+    r = vkBindTensorMemoryKHR(VK_NULL_HANDLE, 1, &bindInfo);
+    if (r != VK_SUCCESS)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Linear tiling with explicit strides                                 */
+/* ------------------------------------------------------------------ */
+
+static int test_tensor_linear_tiling_with_strides(void)
+{
+    uint32_t dims[] = {2, 3, 4};
+    VkDeviceSize strides[] = {48, 16, 4};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_LINEAR_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 3,
+        .pDimensions = dims,
+        .pStrides = strides,
+        .usage = VK_TENSOR_USAGE_TRANSFER_SRC_BIT_KHR | VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &createInfo, NULL, &tensor);
+    if (r != VK_SUCCESS || tensor == VK_NULL_HANDLE)
+        return 1;
+
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = tensor,
+        .memory = (VkDeviceMemory)(uintptr_t)0x1,
+        .memoryOffset = 0,
+    };
+    r = vkBindTensorMemoryKHR(VK_NULL_HANDLE, 1, &bindInfo);
+    if (r != VK_SUCCESS)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -399,6 +493,8 @@ int main(void)
     RUN_TEST(test_create_multiple_formats);
     RUN_TEST(test_tensor_description_owns_dims);
     RUN_TEST(test_alloc_callback_alignment);
+    RUN_TEST(test_tensor_concurrent_sharing);
+    RUN_TEST(test_tensor_linear_tiling_with_strides);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);
