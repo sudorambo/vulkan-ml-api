@@ -26,6 +26,8 @@ CMakeUserPresets.json
 # IDE
 .vscode/settings.json
 .idea/
+.cache/
+.cursor/
 *.swp
 *.swo
 *~
