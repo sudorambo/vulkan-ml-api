@@ -105,6 +105,16 @@ static inline void vk_ml_free(const VkAllocationCallbacks *pAllocator,
 }
 
 /* ------------------------------------------------------------------ */
+/* Feature query helpers                                               */
+/* ------------------------------------------------------------------ */
+
+void vk_ml_populate_features(VkPhysicalDeviceMLFeaturesKHR *features);
+void vk_ml_populate_properties(VkPhysicalDeviceMLPropertiesKHR *props);
+VkBool32 vk_ml_is_tensor_format_supported(VkFormat format);
+void vk_ml_populate_tensor_format_properties(VkFormat format,
+                                             VkTensorFormatPropertiesKHR *props);
+
+/* ------------------------------------------------------------------ */
 /* Format helpers                                                      */
 /* ------------------------------------------------------------------ */
 

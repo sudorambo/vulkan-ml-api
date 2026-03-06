@@ -1530,6 +1530,29 @@ Total: 2 tasks.
 
 ---
 
+### Phase 41: Review Remediation — L2 (Missing prototypes for feature\_query.c functions)
+
+**Goal**: Add forward declarations for the four `feature_query.c` functions to `src/internal.h` for compiler-checked type safety at all call sites.
+
+- [X] T198 In `src/internal.h`, add a "Feature query helpers" section after the allocation helpers with prototypes for `vk_ml_populate_features`, `vk_ml_populate_properties`, `vk_ml_is_tensor_format_supported`, and `vk_ml_populate_tensor_format_properties`. Signatures must match `src/feature_query.c` exactly.
+
+- [X] T199 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: All `feature_query.c` functions have proper prototypes in `internal.h`. Compiler type-checks all call sites.
+
+---
+
+### Phase 41 Dependencies
+
+```text
+T198 — standalone
+T199 — depends on T198
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

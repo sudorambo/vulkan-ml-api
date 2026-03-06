@@ -289,9 +289,9 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L2 — Missing prototypes for feature_query.c functions
 
-- [ ] [P] **File**: `src/internal.h`
+- [x] [P] **File**: `src/internal.h`
 - **Fix**: Add declarations for `vk_ml_populate_features`, `vk_ml_populate_properties`, `vk_ml_is_tensor_format_supported`, `vk_ml_populate_tensor_format_properties` to `internal.h`.
-- **PARTIAL**: The original `tensor_barrier.c` functions are now in the validation layer with proper prototypes in `vk_ml_validation.h` (H6/Phase 17). The feature_query prototypes remain missing.
+- **FIXED**: Phase 41 (T198-T199). Added "Feature query helpers" section with all four prototypes in `src/internal.h`. All 13 tests pass.
 
 ### L3 — pNext shallow-copied in deep_copy_tensor_desc
 
