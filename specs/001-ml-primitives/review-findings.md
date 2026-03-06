@@ -1,8 +1,9 @@
 # Review Findings — VK_KHR_ml_primitives
 
-**Date**: 2026-03-05
+**Review 1 date**: 2026-03-05
+**Review 2 date**: 2026-03-06
 **Scope**: Full repository deep review (src, validation layer, tests, header, build, spec conformance)
-**Build status**: 12/12 tests pass, zero warnings under `-Wall -Wextra -Wpedantic -Werror`
+**Build status**: 13/13 tests pass, zero warnings under `-Wall -Wextra -Wpedantic -Werror`
 **Spec conformance**: 100% — all types, enums, structs, and entry points match the `.adoc` spec
 
 ---
@@ -375,4 +376,123 @@ MEDIUM (incremental quality):
 
 LOW (polish):
   L1-L11  [all independent]
+```
+
+---
+---
+
+## Review 2 — Fresh Full Review (2026-03-06)
+
+**Scope**: Complete re-read of all 30 source/header/test files (9,629 LOC), CMakeLists.txt, .gitignore, README, quickstart example
+**Build status**: 13/13 tests pass, zero warnings
+**Prior findings**: All 42 findings from Review 1 resolved (2 CRITICAL, 10 HIGH, 19 MEDIUM, 11 LOW)
+
+---
+
+### HIGH (1)
+
+#### H11 — Pooling validation inconsistency for Global Average Pool
+
+- [x] **Files**: `layers/validation/graph_validation.c:158-165`, `src/ml_primitives.c:50-57`
+- **Description**: The validation layer (`vk_ml_validate_pooling_desc`) unconditionally rejects `windowWidth == 0` and `strideX == 0` for **all** pool types, including `VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`. For global average pooling, window size and stride are irrelevant — the entire spatial extent is pooled. The ICD layer (`vk_ml_validate_primitive_desc` in `ml_primitives.c`) **correctly** gates these checks on `poolType != GLOBAL_AVERAGE_POOL`, but the validation layer does not. Valid global average pool configurations will produce false validation errors.
+- **Fix**: In `vk_ml_validate_pooling_desc`, gate the window/stride checks on `desc->poolType != VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`, matching the ICD logic.
+- **FIXED**: Phase 48 (T219-T222). Moved `VUID_POOL_TYPE` switch before window/stride checks and gated `VUID_POOL_WINDOW`/`VUID_POOL_STRIDE` on `poolType != GLOBAL_AVERAGE_POOL_KHR`. Added `test_valid_global_average_pool` unit test (window/stride = 0, expects `VK_TRUE`). Updated CTS `test_single_node_global_avg_pool` to use `windowWidth = 0, windowHeight = 0`. All 13 tests pass.
+
+---
+
+### MEDIUM (5)
+
+#### M20 — Inconsistent `internal.h` include paths in validation layer files
+
+- [ ] **Files**: `layers/validation/tensor_validation.c:7`, `layers/validation/graph_validation.c:7`
+- **Description**: `session_validation.c` uses the CMake-resolved `#include "internal.h"`, but `tensor_validation.c` and `graph_validation.c` still use the relative path `#include "../../src/internal.h"`. CMakeLists.txt provides `${CMAKE_CURRENT_SOURCE_DIR}/src` as a PRIVATE include directory for `vk_ml_validation`, so all three should use `#include "internal.h"`. The L10 remediation standardized `vk_ml_validation.h` includes but missed these two `internal.h` includes.
+- **Fix**: Change both files from `#include "../../src/internal.h"` to `#include "internal.h"`.
+
+#### M21 — CTS tests use `extern` workarounds for validation functions
+
+- [ ] **Files**: `tests/cts/test_synchronization.c:15-16`, `tests/cts/test_ml_dispatch.c:7`
+- **Description**: `test_synchronization.c` declares validation functions via raw `extern` instead of including the header. `test_ml_dispatch.c` includes `vk_ml_validation.h` via a fragile relative path `../../layers/validation/vk_ml_validation.h`. Root cause: the CTS test CMake loop only adds `src/` to the include path, not `layers/validation/`.
+- **Fix**: Add `${CMAKE_CURRENT_SOURCE_DIR}/layers/validation` to the CTS test `target_include_directories` block. Then replace `extern` declarations in `test_synchronization.c` with `#include "vk_ml_validation.h"`, and fix the relative path in `test_ml_dispatch.c`.
+
+#### M22 — Missing `VUID_SESSION_SCRATCH_OFFSET_ALIGN` string constant
+
+- [ ] **File**: `src/internal.h`
+- **Description**: `session_validation.c` has a `/* VUID_SESSION_SCRATCH_OFFSET_ALIGN */` comment referencing a VUID, but `internal.h` has no corresponding `#define VUID_SESSION_SCRATCH_OFFSET_ALIGN`. All other 40+ VUIDs used in the validation layer have string constants defined in `internal.h`. This was omitted during Phase 45 (L9 fix).
+- **Fix**: Add `#define VUID_SESSION_SCRATCH_OFFSET_ALIGN "VUID-VkMLSessionCreateInfoKHR-scratchMemoryOffset-00004"` to `internal.h`, following the existing naming convention.
+
+#### M23 — Redundant `extern` declarations in `test_vuids.c`
+
+- [ ] [P] **File**: `tests/validation/test_vuids.c:11-12`
+- **Description**: Lines 11-12 declare `extern void vk_ml_populate_features(...)` and `extern void vk_ml_populate_properties(...)`. Both functions are already declared in `internal.h`, which is included on line 7. These `extern` lines are dead weight.
+- **Fix**: Remove lines 11-12.
+
+#### M24 — Stray `.o` files still present on disk
+
+- [ ] [P] **File**: repo root
+- **Description**: Nine `.o` files physically exist in the project root: `feature_query.o`, `ml_dispatch.o`, `ml_graph.o`, `ml_primitives.o`, `ml_session.o`, `tensor_barrier.o`, `tensor_copy.o`, `tensor.o`, `tensor_view.o`. L8 from Review 1 was marked "pre-resolved" because `.gitignore` has `*.o`, but the files were never actually deleted. Notably, `tensor_barrier.o` is an orphan from before `tensor_barrier.c` was moved to the validation layer in Phase 17. These clutter the working directory and waste disk space (~240KB total).
+- **Fix**: `rm -f *.o` from project root.
+
+---
+
+### LOW (7)
+
+#### L12 — README claims C11 but project uses C17
+
+- [ ] [P] **File**: `README.md:84`
+- **Description**: README says "C compiler with C11 support" but `CMakeLists.txt` sets `set(CMAKE_C_STANDARD 17)` (changed in Phase 42/L5 fix). The README was not updated to reflect this change.
+- **Fix**: Change "C11" to "C17" in the prerequisites section of README.md.
+
+#### L13 — Unnecessary `#include <stdbool.h>` in `vk_ml_validation.h`
+
+- [ ] [P] **File**: `layers/validation/vk_ml_validation.h:12`
+- **Description**: The validation header includes `<stdbool.h>` but exclusively uses `VkBool32`. The `bool` type is never used anywhere in the validation layer.
+- **Fix**: Remove `#include <stdbool.h>`.
+
+#### L14 — Quickstart example inside `BUILD_TESTING` guard
+
+- [ ] [P] **File**: `CMakeLists.txt:132`
+- **Description**: The quickstart example is wrapped inside `if(BUILD_TESTING)`. Examples and tests are distinct concerns. Library consumers who set `-DBUILD_TESTING=OFF` lose access to the example.
+- **Fix**: Either move the example section outside the `if(BUILD_TESTING)` block, or add a separate `option(BUILD_EXAMPLES "Build examples" ON)` guard.
+
+#### L15 — Hardcoded valid usage bitmask in tensor validation
+
+- [ ] [P] **File**: `layers/validation/tensor_validation.c:70`
+- **Description**: `const VkFlags validUsageMask = 0x7F` is a magic number corresponding to the 7 defined `VkTensorUsageFlagBitsKHR` values. If a new usage flag is added to the enum, this mask will silently become stale and reject valid usage combinations.
+- **Fix**: Derive the mask from the highest defined bit: `const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;`
+
+#### L16 — Wasteful temporary allocation in `deep_copy_tensor_desc` usage
+
+- [ ] **File**: `src/ml_graph.c:319-323, 339-343, 359-363`
+- **Description**: External input/output/weight descriptions are deep-copied via `deep_copy_tensor_desc()` which allocates a new struct, then the caller shallow-copies it into the destination array and immediately frees the shell. This repeats 3 times (inputs, outputs, weights), allocating and immediately freeing a struct per description — wasteful.
+- **Fix**: Add a direct "copy-in-place" helper `deep_copy_tensor_desc_into(VkTensorDescriptionKHR *dst, const VkTensorDescriptionKHR *src, allocator)` that copies directly into the destination, eliminating the temporary allocation.
+
+#### L17 — Test files use relative paths for `vk_ml_validation.h` despite CMake support
+
+- [ ] [P] **Files**: `tests/validation/test_vuids.c:6`, `tests/unit/test_dag_validation.c:8`, `tests/unit/test_descriptor_validation.c:7`
+- **Description**: All three use `#include "../../layers/validation/vk_ml_validation.h"` even though their CMake targets include `layers/validation/` as a PRIVATE include directory. Should use `#include "vk_ml_validation.h"`.
+- **Fix**: Change to `#include "vk_ml_validation.h"` in all three files.
+
+#### L18 — Memory requirement functions don't clear `pNext`
+
+- [ ] [P] **Files**: `src/tensor.c:122`, `src/ml_graph.c:417`
+- **Description**: `vkGetTensorMemoryRequirementsKHR` and `vkGetMLGraphMemoryRequirementsKHR` set `sType` and `memoryRequirements` but leave `pNext` untouched. While callers are responsible for initializing the struct, a defensive `pMemoryRequirements->pNext = NULL` would prevent stale pointer issues and align with Vulkan conventions for output structs.
+- **Fix**: Add `pMemoryRequirements->pNext = NULL;` after setting `sType` in both functions.
+
+---
+
+### Review 2 Dependency Order
+
+```text
+HIGH (correctness):
+  H11  [independent]
+
+MEDIUM (quality):
+  M20  [independent — 2 include path fixes]
+  M21  [independent — CMake + include fix]
+  M22  [independent — add VUID define]
+  M23  [P] [independent — remove dead code]
+  M24  [P] [independent — delete files]
+
+LOW (polish):
+  L12-L18  [all independent]
 ```

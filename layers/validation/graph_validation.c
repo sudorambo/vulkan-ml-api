@@ -155,14 +155,6 @@ VkBool32 vk_ml_validate_pooling_desc(
     if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR)
         return VK_FALSE;
 
-    /* VUID_POOL_WINDOW */
-    if (desc->windowWidth == 0 || desc->windowHeight == 0)
-        return VK_FALSE;
-
-    /* VUID_POOL_STRIDE */
-    if (desc->strideX == 0 || desc->strideY == 0)
-        return VK_FALSE;
-
     /* VUID_POOL_TYPE */
     switch (desc->poolType) {
     case VK_ML_OPERATION_TYPE_MAX_POOL_2D_KHR:
@@ -171,6 +163,16 @@ VkBool32 vk_ml_validate_pooling_desc(
         break;
     default:
         return VK_FALSE;
+    }
+
+    if (desc->poolType != VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR) {
+        /* VUID_POOL_WINDOW */
+        if (desc->windowWidth == 0 || desc->windowHeight == 0)
+            return VK_FALSE;
+
+        /* VUID_POOL_STRIDE */
+        if (desc->strideX == 0 || desc->strideY == 0)
+            return VK_FALSE;
     }
 
     return VK_TRUE;

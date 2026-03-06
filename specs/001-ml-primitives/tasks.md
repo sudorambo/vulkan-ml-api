@@ -1706,6 +1706,35 @@ Total: 2 tasks.
 
 ---
 
+## Phase 48: Review Remediation — H11 (Pooling validation inconsistency for Global Average Pool)
+
+**Goal**: Fix `vk_ml_validate_pooling_desc` in `layers/validation/graph_validation.c` to stop unconditionally rejecting `windowWidth == 0` / `strideX == 0` for `VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`. For global average pooling, window size and stride are semantically irrelevant. The ICD layer (`src/ml_primitives.c`) already correctly gates these checks. Align validation with ICD, add a positive unit test, and update the CTS workaround.
+
+- [X] T219 In `layers/validation/graph_validation.c`, restructure `vk_ml_validate_pooling_desc` so that the `VUID_POOL_TYPE` switch (pool type validation) runs **before** the `VUID_POOL_WINDOW` / `VUID_POOL_STRIDE` checks, and gate the window/stride checks on `desc->poolType != VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`. The resulting function body after the sType check should be: (1) `VUID_POOL_TYPE` switch rejecting invalid pool types, (2) conditional block `if (desc->poolType != VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR)` containing the `VUID_POOL_WINDOW` and `VUID_POOL_STRIDE` zero-checks, (3) `return VK_TRUE`. This matches the ICD logic in `src/ml_primitives.c:50-56`.
+
+- [X] T220 [P] In `tests/unit/test_descriptor_validation.c`, add a new test function `test_valid_global_average_pool` that creates a `VkMLPrimitiveDescPoolingKHR` with `poolType = VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR`, `windowWidth = 0`, `windowHeight = 0`, `strideX = 0`, `strideY = 0`, valid sType, and calls `vk_ml_validate_pooling_desc`. Assert the result is `VK_TRUE` via `expect("test_valid_global_average_pool", r, VK_TRUE)`. Register the new test in `main()` alongside the existing pooling tests.
+
+- [X] T221 [P] In `tests/cts/test_ml_graph.c`, update the `test_single_node_global_avg_pool` function: change the pooling descriptor's `.windowWidth` from `1` to `0` and `.windowHeight` from `1` to `0`. This removes the workaround for the bug and tests the correct semantics (global average pool ignores window dimensions).
+
+- [X] T222 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: `vk_ml_validate_pooling_desc` now accepts valid global average pool descriptors with window/stride = 0. Existing negative tests for max/average pool zero-window/zero-stride still pass. ICD and validation layer behavior are aligned.
+
+---
+
+### Phase 48 Dependencies
+
+```text
+T219 — standalone (validation fix)
+T220 — standalone [P] (unit test, different file)
+T221 — standalone [P] (CTS test, different file)
+T222 — depends on T219, T220, T221
+
+Total: 4 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

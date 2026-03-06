@@ -400,6 +400,28 @@ static void test_dimension_product_overflow(void)
     expect("test_dimension_product_overflow", r, VK_FALSE);
 }
 
+static void test_valid_global_average_pool(void)
+{
+    VkMLPrimitiveDescPoolingKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR,
+        .pNext = NULL,
+        .poolType = VK_ML_OPERATION_TYPE_GLOBAL_AVERAGE_POOL_KHR,
+        .inputLayout = VK_ML_TENSOR_LAYOUT_NCHW_KHR,
+        .windowWidth = 0,
+        .windowHeight = 0,
+        .strideX = 0,
+        .strideY = 0,
+        .paddingMode = VK_ML_PADDING_MODE_VALID_KHR,
+        .paddingTop = 0,
+        .paddingBottom = 0,
+        .paddingLeft = 0,
+        .paddingRight = 0,
+    };
+
+    VkBool32 r = vk_ml_validate_pooling_desc(&desc);
+    expect("test_valid_global_average_pool", r, VK_TRUE);
+}
+
 int main(void)
 {
     passed = 0;
@@ -412,6 +434,7 @@ int main(void)
     test_gemm_infinite_alpha();
     test_gemm_nan_beta();
     test_valid_pooling();
+    test_valid_global_average_pool();
     test_pool_zero_window();
     test_pool_zero_stride();
     test_pool_invalid_type();
