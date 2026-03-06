@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(vulkan_ml_primitives
-    VERSION 1.0.0
+    VERSION 1.0.5
     LANGUAGES C
     DESCRIPTION "VK_KHR_ml_primitives Vulkan extension reference implementation"
 )

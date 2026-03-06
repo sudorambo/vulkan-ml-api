@@ -1,7 +1,7 @@
 # Doxyfile for VK_KHR_ml_primitives
 
 PROJECT_NAME           = "VK_KHR_ml_primitives"
-PROJECT_NUMBER         = 1.0.0
+PROJECT_NUMBER         = 1.0.5
 PROJECT_BRIEF          = "Vulkan ML Primitives Extension Reference Implementation"
 OUTPUT_DIRECTORY       = docs
 

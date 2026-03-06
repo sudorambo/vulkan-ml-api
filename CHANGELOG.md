@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-03-06
+
+### Added
+
+- `VK_ML_REF_ENABLE_VALIDATION` CMake option to wire validation into ICD stubs at compile time
+
+### Changed
+
+- `vkGetTensorMemoryRequirementsKHR` now accounts for explicit `pStrides` (strided layout sizing)
+- `vkBindTensorMemoryKHR` returns `VK_ERROR_VALIDATION_FAILED_EXT` for already-bound and misaligned-offset errors instead of generic `VK_ERROR_UNKNOWN`
+- `VkMLSessionKHR_T` uses a dedicated `void *autoScratchHost` field instead of type-punning `VkDeviceMemory`
+- cppcheck CI invocation includes `layers/validation` include path
+
 ## [1.0.0] - 2026-03-05
 
 ### Added
