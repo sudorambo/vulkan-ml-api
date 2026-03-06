@@ -156,9 +156,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M4 — Magic integer literals in format element size
 
-- [ ] [P] **File**: `src/internal.h:122-125`
+- [x] [P] **File**: `src/internal.h:123-126`
 - **Description**: `vk_ml_format_element_size` switch cases use raw integers (`1000559001`) instead of the enum names (`VK_FORMAT_R16_BFLOAT_KHR`).
 - **Fix**: Replace with `case (uint32_t)VK_FORMAT_R16_BFLOAT_KHR:` etc.
+- **FIXED**: Phase 25 (T149-T150). Replaced all 4 magic integers with `(uint32_t)VK_FORMAT_*` enum casts. Zero behavioral change. All 13 tests pass.
 
 ### M5 — `is_finite_float` fragile under `-ffast-math`
 

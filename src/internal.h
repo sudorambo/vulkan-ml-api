@@ -120,10 +120,10 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
     case VK_FORMAT_R16_UINT:         return 2;
     case VK_FORMAT_R32_SINT:         return 4;
     case VK_FORMAT_R32_UINT:         return 4;
-    case 1000559001: /* VK_FORMAT_R16_BFLOAT_KHR */ return 2;
-    case 1000559002: /* VK_FORMAT_R8_E4M3_KHR */   return 1;
-    case 1000559003: /* VK_FORMAT_R8_E5M2_KHR */   return 1;
-    case 1000559000: /* VK_FORMAT_R8_BOOL */       return 1;
+    case (uint32_t)VK_FORMAT_R16_BFLOAT_KHR: return 2;
+    case (uint32_t)VK_FORMAT_R8_E4M3_KHR:   return 1;
+    case (uint32_t)VK_FORMAT_R8_E5M2_KHR:   return 1;
+    case (uint32_t)VK_FORMAT_R8_BOOL:        return 1;
     default:                         return 0;
     }
 }

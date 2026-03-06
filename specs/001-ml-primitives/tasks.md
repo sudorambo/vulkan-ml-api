@@ -1069,6 +1069,37 @@ Total: 2 tasks. Sequential.
 
 ---
 
+## Phase 25: Review Remediation — M4 (Magic Integer Literals in Format Element Size)
+
+**Goal**: Replace raw integer literals in `vk_ml_format_element_size` switch cases with their corresponding `VK_FORMAT_*` enum names. The enum values are defined in `include/vulkan/vulkan_ml_primitives.h:111-114`. Resolves MEDIUM finding M4 from `review-findings.md`.
+
+### Sub-phase 25a: Replace magic integers
+
+- [X] T149 In `src/internal.h`, replace the 4 magic integer cases in `vk_ml_format_element_size` (lines 123-126):
+  - `case 1000559001: /* VK_FORMAT_R16_BFLOAT_KHR */ return 2;` → `case (uint32_t)VK_FORMAT_R16_BFLOAT_KHR: return 2;`
+  - `case 1000559002: /* VK_FORMAT_R8_E4M3_KHR */   return 1;` → `case (uint32_t)VK_FORMAT_R8_E4M3_KHR:   return 1;`
+  - `case 1000559003: /* VK_FORMAT_R8_E5M2_KHR */   return 1;` → `case (uint32_t)VK_FORMAT_R8_E5M2_KHR:   return 1;`
+  - `case 1000559000: /* VK_FORMAT_R8_BOOL */       return 1;` → `case (uint32_t)VK_FORMAT_R8_BOOL:        return 1;`
+
+### Sub-phase 25b: Build + test verification
+
+- [X] T150 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: No magic integer literals remain in `vk_ml_format_element_size`. All format cases use named enum constants. Zero behavioral change.
+
+---
+
+### Phase 25 Dependencies
+
+```text
+Sub-phase 25a (replace): T149 — single file change
+Sub-phase 25b (verify):  T150 — depends on T149
+
+Total: 2 tasks. Sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
