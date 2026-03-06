@@ -79,6 +79,13 @@ typedef struct VkMLSessionKHR_T {
 #define VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN   64
 #define VK_ML_REF_MAX_SCRATCH_MEMORY_SIZE   (1ULL << 30)
 
+/* Portable max alignment (MSVC C mode lacks _Alignof/max_align_t) */
+#if defined(_MSC_VER)
+#define VK_ML_MAX_ALIGNMENT 16
+#else
+#define VK_ML_MAX_ALIGNMENT _Alignof(max_align_t)
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Allocation helpers                                                  */
 /* ------------------------------------------------------------------ */
@@ -88,7 +95,7 @@ static inline void *vk_ml_alloc(const VkAllocationCallbacks *pAllocator, size_t 
     if (size == 0)
         return NULL;
     if (pAllocator && pAllocator->pfnAllocation) {
-        return pAllocator->pfnAllocation(pAllocator->pUserData, size, _Alignof(max_align_t),
+        return pAllocator->pfnAllocation(pAllocator->pUserData, size, VK_ML_MAX_ALIGNMENT,
                                          VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
     }
     return malloc(size);

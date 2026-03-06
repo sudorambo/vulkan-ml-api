@@ -23,7 +23,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(VkDevice device,
     if (pCreateInfo->scratchMemory != VK_NULL_HANDLE) {
         if (pCreateInfo->scratchMemorySize == 0)
             return VK_ERROR_INITIALIZATION_FAILED;
-        if (pCreateInfo->scratchMemoryOffset % _Alignof(max_align_t) != 0)
+        if (pCreateInfo->scratchMemoryOffset % VK_ML_MAX_ALIGNMENT != 0)
             return VK_ERROR_INITIALIZATION_FAILED;
     }
 
