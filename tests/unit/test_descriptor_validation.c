@@ -363,6 +363,137 @@ static void test_elem_invalid_op(void)
     expect("test_elem_invalid_op", r, VK_FALSE);
 }
 
+/* ------------------------------------------------------------------ */
+/* T034: Integer overflow in tensor view bounds                        */
+/* ------------------------------------------------------------------ */
+
+static void test_tensor_view_overflow_bounds(void)
+{
+    uint32_t dims[] = {100};
+    VkTensorKHR_T tensor = {
+        .description = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+            .pNext = NULL,
+            .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+            .format = VK_FORMAT_R32_SFLOAT,
+            .dimensionCount = 1,
+            .pDimensions = dims,
+            .pStrides = NULL,
+            .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+        },
+        .dimensions = dims,
+        .strides = NULL,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .queueFamilyIndices = NULL,
+        .boundMemory = (VkDeviceMemory)(uintptr_t)0x1,
+        .memoryOffset = 0,
+        .memoryBound = VK_TRUE,
+    };
+
+    uint32_t offsets[] = {UINT32_MAX - 10};
+    uint32_t sizes[] = {20};
+    VkTensorViewCreateInfoKHR viewInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .tensor = VK_NULL_HANDLE,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 1,
+        .pDimensionOffsets = offsets,
+        .pDimensionSizes = sizes,
+    };
+
+    VkBool32 r = vk_ml_validate_tensor_view_create(&viewInfo, &tensor);
+    expect("test_tensor_view_overflow_bounds", r, VK_FALSE);
+}
+
+/* ------------------------------------------------------------------ */
+/* T036: Activation descriptor validation                              */
+/* ------------------------------------------------------------------ */
+
+static void test_activation_valid_relu(void)
+{
+    VkMLPrimitiveDescActivationKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR,
+        .pNext = NULL,
+        .activationType = VK_ML_ACTIVATION_FUNCTION_RELU_KHR,
+        .param0 = 0.0f,
+        .param1 = 0.0f,
+    };
+    VkBool32 r = vk_ml_validate_activation_desc(&desc);
+    expect("test_activation_valid_relu", r, VK_TRUE);
+}
+
+static void test_activation_invalid_type(void)
+{
+    VkMLPrimitiveDescActivationKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR,
+        .pNext = NULL,
+        .activationType = (VkMLActivationFunctionKHR)999,
+        .param0 = 0.0f,
+        .param1 = 0.0f,
+    };
+    VkBool32 r = vk_ml_validate_activation_desc(&desc);
+    expect("test_activation_invalid_type", r, VK_FALSE);
+}
+
+static void test_activation_clamp_param0_gt_param1(void)
+{
+    VkMLPrimitiveDescActivationKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR,
+        .pNext = NULL,
+        .activationType = VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR,
+        .param0 = 5.0f,
+        .param1 = 1.0f,
+    };
+    VkBool32 r = vk_ml_validate_activation_desc(&desc);
+    expect("test_activation_clamp_param0_gt_param1", r, VK_FALSE);
+}
+
+static void test_activation_clamp_valid(void)
+{
+    VkMLPrimitiveDescActivationKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR,
+        .pNext = NULL,
+        .activationType = VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR,
+        .param0 = 1.0f,
+        .param1 = 5.0f,
+    };
+    VkBool32 r = vk_ml_validate_activation_desc(&desc);
+    expect("test_activation_clamp_valid", r, VK_TRUE);
+}
+
+/* ------------------------------------------------------------------ */
+/* T041: Copy region pExtents NULL check                               */
+/* ------------------------------------------------------------------ */
+
+static void test_copy_pextents_null(void)
+{
+    VkTensorKHR src_handle = (VkTensorKHR)(uintptr_t)0x1;
+    VkTensorKHR dst_handle = (VkTensorKHR)(uintptr_t)0x2;
+
+    VkTensorCopyKHR region = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_COPY_KHR,
+        .pNext = NULL,
+        .dimensionCount = 4,
+        .pSrcOffsets = (uint32_t[]){0, 0, 0, 0},
+        .pDstOffsets = (uint32_t[]){0, 0, 0, 0},
+        .pExtents = NULL,
+    };
+    VkCopyTensorInfoKHR copyInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR,
+        .pNext = NULL,
+        .srcTensor = src_handle,
+        .dstTensor = dst_handle,
+        .regionCount = 1,
+        .pRegions = &region,
+    };
+
+    VkBool32 r = vk_ml_validate_tensor_copy(&copyInfo);
+    expect("test_copy_pextents_null", r, VK_FALSE);
+}
+
 static void test_dimension_product_overflow(void)
 {
     VkPhysicalDeviceMLFeaturesKHR features = {0};
@@ -442,6 +573,12 @@ int main(void)
     test_valid_elementwise();
     test_elem_invalid_op();
     test_dimension_product_overflow();
+    test_tensor_view_overflow_bounds();
+    test_activation_valid_relu();
+    test_activation_invalid_type();
+    test_activation_clamp_param0_gt_param1();
+    test_activation_clamp_valid();
+    test_copy_pextents_null();
 
     (void)printf("\nTotal: %d passed, %d failed\n", passed, failed);
     return failed == 0 ? 0 : 1;

@@ -15,7 +15,7 @@ VkBool32 vk_ml_validate_tensor_create(
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
-    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR)
+    if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_TENSOR_OBJECTS_FEATURE */
@@ -92,7 +92,7 @@ VkBool32 vk_ml_validate_tensor_view_create(
 {
     if (!pCreateInfo || !tensor)
         return VK_FALSE;
-    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR)
+    if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_TENSOR_VIEW_MEMORY_BOUND */
@@ -114,7 +114,10 @@ VkBool32 vk_ml_validate_tensor_view_create(
 
     /* VUID_TENSOR_VIEW_RANGE */
     for (uint32_t i = 0; i < pCreateInfo->dimensionCount; i++) {
-        if (pCreateInfo->pDimensionOffsets[i] + pCreateInfo->pDimensionSizes[i] > tensor->dimensions[i])
+        if (pCreateInfo->pDimensionSizes[i] == 0)
+            return VK_FALSE;
+        if (pCreateInfo->pDimensionSizes[i] > tensor->dimensions[i] ||
+            pCreateInfo->pDimensionOffsets[i] > tensor->dimensions[i] - pCreateInfo->pDimensionSizes[i])
             return VK_FALSE;
     }
 
@@ -128,7 +131,7 @@ VkBool32 vk_ml_validate_tensor_bind(
 {
     if (!pBindInfo || !tensor || !props)
         return VK_FALSE;
-    if ((int)pBindInfo->sType != VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR)
+    if ((uint32_t)pBindInfo->sType != VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_BIND_TENSOR_ALREADY_BOUND */
@@ -152,7 +155,11 @@ VkBool32 vk_ml_validate_tensor_copy(
 {
     if (!pCopyInfo)
         return VK_FALSE;
-    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
+    if ((uint32_t)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
+        return VK_FALSE;
+
+    /* VUID_COPY_TENSOR_HANDLES */
+    if (pCopyInfo->srcTensor == VK_NULL_HANDLE || pCopyInfo->dstTensor == VK_NULL_HANDLE)
         return VK_FALSE;
 
     /* VUID_COPY_TENSOR_SAME */
@@ -168,13 +175,16 @@ VkBool32 vk_ml_validate_tensor_copy(
 
     for (uint32_t i = 0; i < pCopyInfo->regionCount; i++) {
         const VkTensorCopyKHR *region = &pCopyInfo->pRegions[i];
-        if ((int)region->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
+        if ((uint32_t)region->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
             return VK_FALSE;
         /* VUID_COPY_TENSOR_SRC_OFFSETS */
         if (region->dimensionCount > 0 && !region->pSrcOffsets)
             return VK_FALSE;
         /* VUID_COPY_TENSOR_DST_OFFSETS */
         if (region->dimensionCount > 0 && !region->pDstOffsets)
+            return VK_FALSE;
+        /* VUID_COPY_TENSOR_EXTENTS */
+        if (region->dimensionCount > 0 && !region->pExtents)
             return VK_FALSE;
     }
 

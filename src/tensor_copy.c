@@ -21,7 +21,7 @@ VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(
 
     if (!commandBuffer || !pCopyInfo)
         return;
-    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
+    if ((uint32_t)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
         return;
 
     if (pCopyInfo->srcTensor == VK_NULL_HANDLE || pCopyInfo->dstTensor == VK_NULL_HANDLE)
@@ -33,9 +33,9 @@ VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(
 
     for (uint32_t i = 0; i < pCopyInfo->regionCount; i++) {
         const VkTensorCopyKHR *r = &pCopyInfo->pRegions[i];
-        if ((int)r->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
+        if ((uint32_t)r->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
             return;
-        if (r->dimensionCount > 0 && (!r->pSrcOffsets || !r->pDstOffsets))
+        if (r->dimensionCount > 0 && (!r->pSrcOffsets || !r->pDstOffsets || !r->pExtents))
             return;
     }
 

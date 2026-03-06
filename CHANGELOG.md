@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-03-05
 
 ### Added
 
@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enriched `vkCmdCopyTensorKHR` and `vkCmdDispatchMLGraphKHR` stubs with parameter validation
 - `vk_ml_validate_primitive_desc` integration into `vkCreateMLGraphKHR`
 - Doxygen configuration for API reference generation
+- Concat, Reshape, Transpose, Resize primitive descriptor types in ICD and validation
+- Activation descriptor validation (enum range, clamp param ordering)
+- Deep-copy of pointer-containing descriptors (Reshape `pOutputDimensions`, Transpose `pPermutation`)
+- sType validation for `vkCreateTensorKHR` and `vkCreateTensorViewKHR`
+- Scratch memory size and offset alignment validation in session creation
+- `clang-format` compliance check in CI
+- Tests for integer overflow, NULL handles, activation validation, diamond DAG, new ops, deep-copy
 
 ### Changed
 
@@ -32,9 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ICD `vkCreateMLSessionKHR` implements scratch auto-allocation when `scratchMemory == VK_NULL_HANDLE`
 - Graph validation layer now delegates to per-descriptor validators
 - Conv group count TODO resolved with deferred-to-dispatch note
+- Reassigned 4 colliding `VkStructureType` values to unique range (1000559024–1000559027)
+- Renamed `VK_FORMAT_R8_BOOL` to `VK_FORMAT_R8_BOOL_KHR` for KHR naming consistency
+- Moved `VkMLResizeModeKHR` enum to the Enumerations section of the header
+- `vkBindTensorMemoryKHR` now returns `VK_ERROR_UNKNOWN` for NULL handles instead of silently skipping
+- Validation layer rejects unknown operation sTypes instead of silently accepting
+- Replaced all `(int)` casts on sType comparisons with `(uint32_t)` across ICD and validation
+- CMake exported targets now use `VulkanML::` namespace
+- pkg-config `libdir` uses `@CMAKE_INSTALL_LIBDIR@` for relocatable installs
+- clang-tidy defers to `.clang-tidy` config instead of inline overrides
+- CI uses dynamic Ubuntu codename via `lsb_release -cs`
+- Compiler requirements updated to GCC 12+, Clang 15+, MSVC 2022+
 
 ### Fixed
 
+- Critical: 4 duplicate `VkStructureType` values causing undefined dispatch behavior
+- Critical: Integer overflow in tensor view bounds check
+- Critical: Stack buffer overflow in DAG cycle detection (fixed-size array → dynamic allocation)
+- Critical: NULL dereference in scratch size calculation when graph has no nodes
+- High: Uninitialized session struct fields (zero-initialized via `memset`)
+- High: Missing `pExtents` NULL check in tensor copy region validation
 - OOM test for session creation updated to use explicit scratch memory
 
 ## [0.1.0] - 2026-03-05

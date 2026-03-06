@@ -118,6 +118,14 @@ static size_t op_desc_size_by_stype(VkStructureType sType)
         return sizeof(VkMLPrimitiveDescNormalizationKHR);
     case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR:
         return sizeof(VkMLPrimitiveDescElementwiseKHR);
+    case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR:
+        return sizeof(VkMLPrimitiveDescConcatKHR);
+    case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR:
+        return sizeof(VkMLPrimitiveDescReshapeKHR);
+    case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR:
+        return sizeof(VkMLPrimitiveDescTransposeKHR);
+    case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR:
+        return sizeof(VkMLPrimitiveDescResizeKHR);
     default:
         return 0;
     }
@@ -137,6 +145,40 @@ static void *deep_copy_op_desc(const void *pDesc,
         return NULL;
     memcpy(copy, pDesc, sz);
     ((VkBaseOutStructure *)copy)->pNext = NULL;
+
+    /* Deep-copy pointer-containing descriptors */
+    uint32_t desc_stype = (uint32_t)base->sType;
+    if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR) {
+        VkMLPrimitiveDescReshapeKHR *reshape =
+            (VkMLPrimitiveDescReshapeKHR *)copy;
+        if (reshape->dimensionCount > 0 && reshape->pOutputDimensions) {
+            uint32_t *dims = (uint32_t *)vk_ml_alloc(pAllocator,
+                reshape->dimensionCount * sizeof(uint32_t));
+            if (!dims) {
+                vk_ml_free(pAllocator, copy);
+                return NULL;
+            }
+            memcpy(dims, reshape->pOutputDimensions,
+                reshape->dimensionCount * sizeof(uint32_t));
+            reshape->pOutputDimensions = dims;
+        }
+    }
+    if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR) {
+        VkMLPrimitiveDescTransposeKHR *transpose =
+            (VkMLPrimitiveDescTransposeKHR *)copy;
+        if (transpose->dimensionCount > 0 && transpose->pPermutation) {
+            uint32_t *perm = (uint32_t *)vk_ml_alloc(pAllocator,
+                transpose->dimensionCount * sizeof(uint32_t));
+            if (!perm) {
+                vk_ml_free(pAllocator, copy);
+                return NULL;
+            }
+            memcpy(perm, transpose->pPermutation,
+                transpose->dimensionCount * sizeof(uint32_t));
+            transpose->pPermutation = perm;
+        }
+    }
+
     return copy;
 }
 
@@ -204,8 +246,22 @@ static void free_node_deep_data(VkMLGraphNodeCreateInfoKHR *node,
 {
     if (!node)
         return;
-    vk_ml_free(pAllocator, (void *)node->pOperationDesc);
-    node->pOperationDesc = NULL;
+    if (node->pOperationDesc) {
+        uint32_t desc_stype =
+            *(const uint32_t *)node->pOperationDesc;
+        if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR) {
+            VkMLPrimitiveDescReshapeKHR *reshape =
+                (VkMLPrimitiveDescReshapeKHR *)node->pOperationDesc;
+            vk_ml_free(pAllocator, (void *)reshape->pOutputDimensions);
+        }
+        if (desc_stype == (uint32_t)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR) {
+            VkMLPrimitiveDescTransposeKHR *transpose =
+                (VkMLPrimitiveDescTransposeKHR *)node->pOperationDesc;
+            vk_ml_free(pAllocator, (void *)transpose->pPermutation);
+        }
+        vk_ml_free(pAllocator, (void *)node->pOperationDesc);
+        node->pOperationDesc = NULL;
+    }
 
     if (node->pInputs) {
         for (uint32_t i = 0; i < node->inputCount; i++)
@@ -460,7 +516,11 @@ VKAPI_ATTR void VKAPI_CALL vkGetMLGraphMemoryRequirementsKHR(
 
     pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
     pMemoryRequirements->pNext = NULL;
-    pMemoryRequirements->memoryRequirements.size = g->scratchMemorySize;
+    if (!g->nodes) {
+        pMemoryRequirements->memoryRequirements.size = 0;
+    } else {
+        pMemoryRequirements->memoryRequirements.size = g->scratchMemorySize;
+    }
     pMemoryRequirements->memoryRequirements.alignment = VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0xFFFFFFFFu;
 }

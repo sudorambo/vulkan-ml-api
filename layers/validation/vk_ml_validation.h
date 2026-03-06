@@ -59,6 +59,21 @@ VkBool32 vk_ml_validate_elementwise_desc(
     const VkMLPrimitiveDescElementwiseKHR *desc,
     const VkPhysicalDeviceMLFeaturesKHR *features);
 
+VkBool32 vk_ml_validate_activation_desc(
+    const VkMLPrimitiveDescActivationKHR *desc);
+
+VkBool32 vk_ml_validate_concat_desc(
+    const VkMLPrimitiveDescConcatKHR *desc);
+
+VkBool32 vk_ml_validate_reshape_desc(
+    const VkMLPrimitiveDescReshapeKHR *desc);
+
+VkBool32 vk_ml_validate_transpose_desc(
+    const VkMLPrimitiveDescTransposeKHR *desc);
+
+VkBool32 vk_ml_validate_resize_desc(
+    const VkMLPrimitiveDescResizeKHR *desc);
+
 /* Session validation */
 VkBool32 vk_ml_validate_session_create(
     const VkMLSessionCreateInfoKHR *pCreateInfo,

@@ -70,10 +70,10 @@ enum {
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR         = 1000559021,
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR       = 1000559022,
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR          = 1000559023,
-    VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR            = 1000559020,
-    VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR                 = 1000559021,
-    VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR            = 1000559022,
-    VK_STRUCTURE_TYPE_TENSOR_COPY_KHR                       = 1000559023,
+    VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR            = 1000559024,
+    VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR                 = 1000559025,
+    VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR            = 1000559026,
+    VK_STRUCTURE_TYPE_TENSOR_COPY_KHR                       = 1000559027,
 };
 
 /* VkObjectType extensions (T004) */
@@ -112,7 +112,7 @@ enum {
 
 /* VkFormat extensions for ML tensor element types */
 enum {
-    VK_FORMAT_R8_BOOL       = 1000559000,
+    VK_FORMAT_R8_BOOL_KHR    = 1000559000,
     VK_FORMAT_R16_BFLOAT_KHR = 1000559001,
     VK_FORMAT_R8_E4M3_KHR   = 1000559002,
     VK_FORMAT_R8_E5M2_KHR   = 1000559003,
@@ -203,6 +203,13 @@ typedef enum VkMLTensorBindingTypeKHR {
     VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR = 3,  /**< Constant weight; tensorIndex into pConstantWeightDescriptions. */
     VK_ML_TENSOR_BINDING_TYPE_MAX_ENUM_KHR        = 0x7FFFFFFF
 } VkMLTensorBindingTypeKHR;
+
+/** @brief Interpolation mode for spatial resize operations. */
+typedef enum VkMLResizeModeKHR {
+    VK_ML_RESIZE_MODE_NEAREST_KHR  = 0,  /**< Nearest-neighbor interpolation. */
+    VK_ML_RESIZE_MODE_BILINEAR_KHR = 1,  /**< Bilinear interpolation. */
+    VK_ML_RESIZE_MODE_MAX_ENUM_KHR = 0x7FFFFFFF
+} VkMLResizeModeKHR;
 
 /* ------------------------------------------------------------------ */
 /* Bitmask types (T005)                                                */
@@ -440,13 +447,6 @@ typedef struct VkMLPrimitiveDescElementwiseKHR {
     float                        activationParam0;
     float                        activationParam1;
 } VkMLPrimitiveDescElementwiseKHR;
-
-/** @brief Interpolation mode for spatial resize operations. */
-typedef enum VkMLResizeModeKHR {
-    VK_ML_RESIZE_MODE_NEAREST_KHR  = 0,  /**< Nearest-neighbor interpolation. */
-    VK_ML_RESIZE_MODE_BILINEAR_KHR = 1,  /**< Bilinear interpolation. */
-    VK_ML_RESIZE_MODE_MAX_ENUM_KHR = 0x7FFFFFFF
-} VkMLResizeModeKHR;
 
 /** @brief Descriptor for concatenation along a specified dimension. */
 typedef struct VkMLPrimitiveDescConcatKHR {

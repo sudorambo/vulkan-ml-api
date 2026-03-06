@@ -1,118 +1,106 @@
-# Implementation Plan: L12–L18 Low-Severity Polish Batch
+# Implementation Plan: v1.0 Release Readiness
 
-**Branch**: `001-ml-primitives` | **Date**: 2026-03-06 | **Spec**: Review 2 findings L12–L18
-**Input**: `specs/001-ml-primitives/review-findings.md:444-484`
+**Branch**: `001-ml-primitives` | **Date**: 2026-03-05 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/specs/001-ml-primitives/spec.md`, review findings from [v1.0-readiness.plan.md](v1.0-readiness.plan.md)
 
 ## Summary
 
-Batch remediation of 7 independent LOW-severity findings from Review 2. These are polish-level changes: documentation accuracy, dead includes, build structure, magic number elimination, micro-optimization of allocation patterns, include path consistency, and defensive output struct initialization. No behavioral changes to the API.
+Resolve all blocking issues identified in the ship-readiness review so the
+`vulkan-ml-api` repository can be tagged `1.0.0`. The existing 0.1.0
+implementation covers all 13 API entry points, 21 ML primitive types, a
+validation layer with 81 VUIDs, and a 14-executable test suite. The review
+uncovered 5 critical, 9 high, 13 medium, and 9 low-severity issues that
+must be addressed before the API surface can be frozen for 1.0.
+
+The technical approach is a 6-phase fix-up plan ordered by dependency:
+public header fixes first (sType collisions, naming), then ICD correctness
+(NULL dereferences, uninitialized memory, missing deep-copy), validation
+layer hardening (integer overflow, stack overflow, missing checks), build
+infrastructure (clang-tidy, pkg-config, CI), test coverage for all fixes,
+and finally release polish (version bump, CHANGELOG).
 
 ## Technical Context
 
-**Language/Version**: C17 (`CMAKE_C_STANDARD 17`)
-**Primary Dependencies**: Vulkan 1.3, `VK_KHR_ml_primitives` (internal ICD + validation layer)
-**Storage**: N/A
-**Testing**: CTest (13 existing tests — 10 CTS, 1 validation, 2 unit)
-**Target Platform**: Linux x86_64 (current), cross-platform by design
-**Project Type**: Library (ICD reference implementation + validation layer)
-**Constraints**: Zero warnings, all 13 tests must pass after changes
+**Language/Version**: C17 (`-std=c17`, GCC 11+, Clang 14+, MSVC 2022+)
+**Primary Dependencies**: Vulkan 1.3 SDK (headers + loader), CMake 3.20+
+**Storage**: N/A (GPU memory managed via Vulkan device memory)
+**Testing**: CTest with custom C test executables (no external test framework)
+**Target Platform**: Linux x86_64/aarch64, Windows x86_64, macOS (via MoltenVK), Android aarch64
+**Project Type**: Library (static C library: reference ICD + validation layer)
+**Performance Goals**: Zero host allocations in dispatch/barrier hot paths; graph compilation is setup-time only
+**Constraints**: Public headers must compile cleanly under `-Wall -Wextra -Wpedantic -Werror` on all supported compilers; all sType values must be unique
+**Scale/Scope**: ~3500 LOC across ICD + validation + tests; 35 issues to resolve for 1.0
 
 ## Constitution Check
 
-*GATE: Must pass before proceeding.*
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-| Principle | Relevant? | Status | Notes |
-|-----------|-----------|--------|-------|
-| I. Spec-Driven | Low | PASS | No spec behavior changes. L15 improves adherence to spec enum values. |
-| II. Vulkan C API | Yes | PASS | All changes maintain Vulkan naming/patterns. L18 aligns with Vulkan output struct conventions. |
-| III. Portability | Low | PASS | No platform-specific changes. |
-| IV. Test-First | Yes | PASS | No new behavior to test. Existing 13 tests verify no regressions. L16 requires care — new helper must not break existing deep-copy semantics. |
-| V. Resource Lifecycle | Yes | PASS | L16 eliminates wasteful alloc/free cycle. L18 defensively clears output pointers. |
-| VI. Backward Compat | N/A | PASS | Internal changes only. No API surface modification. |
-| VII. Simplicity | Yes | PASS | All changes reduce complexity (remove dead code, eliminate magic numbers, simplify allocation patterns). |
+| Principle | Status | Evidence |
+|-----------|--------|----------|
+| I. Specification-Driven Development | PASS | All fixes trace to VUIDs or spec requirements. No new behavior is introduced beyond what the spec mandates. |
+| II. Vulkan C API Conventions (NON-NEGOTIABLE) | VIOLATION → FIX | C1: Duplicate sType values violate "sType values MUST be unique and registered." H8: `VK_FORMAT_R8_BOOL` missing `_KHR` suffix violates naming convention. Both are addressed in Phase 1. |
+| III. Portability and Cross-Vendor Compliance | PASS | M5 (pkg-config libdir) and M9 (CI codename) are portability fixes. No vendor-specific assumptions introduced. |
+| IV. Test-First with Validation Layers (NON-NEGOTIABLE) | VIOLATION → FIX | C4: Integer overflow bypasses validation. C5: Stack overflow in DFS. H6/H7: Missing validation checks. All addressed in Phase 3 with corresponding tests in Phase 5. |
+| V. Explicit Resource Lifecycle and Memory Safety | VIOLATION → FIX | C3: NULL dereference in scratch calc. H2: Uninitialized session struct. H3: Missing scratch size enforcement. All addressed in Phase 2. |
+| VI. Backward Compatibility and Extension Versioning | PASS | C1 fix reassigns sType values that were already colliding (broken), so the fix restores correctness rather than breaking compatibility. No published consumers exist yet (pre-1.0). |
+| VII. Simplicity and Composability | PASS | No new abstractions introduced. All fixes simplify or harden existing code. |
 
-No violations. No complexity tracking needed.
-
-## Findings Analysis
-
-### L12 — README claims C11 but project uses C17
-
-- **File**: `README.md:84`
-- **Current**: `"C compiler with C11 support"`
-- **Target**: `"C compiler with C17 support"`
-- **Risk**: None. Documentation-only change.
-
-### L13 — Unnecessary `#include <stdbool.h>` in `vk_ml_validation.h`
-
-- **File**: `layers/validation/vk_ml_validation.h:12`
-- **Current**: `#include <stdbool.h>` present but `bool` never used (only `VkBool32`)
-- **Target**: Remove the include
-- **Risk**: None. Verified no `bool` usage in any validation layer source file.
-
-### L14 — Quickstart example inside `BUILD_TESTING` guard
-
-- **File**: `CMakeLists.txt:130-137`
-- **Current**: `add_executable(quickstart ...)` is inside `if(BUILD_TESTING)` block
-- **Target**: Move example build outside `if(BUILD_TESTING)` block, add separate `option(BUILD_EXAMPLES "Build example programs" ON)` guard
-- **Risk**: Low. The quickstart target is independent — it only links `vk_ml_primitives`, not `vk_ml_validation`.
-
-### L15 — Hardcoded valid usage bitmask in tensor validation
-
-- **File**: `layers/validation/tensor_validation.c:70`
-- **Current**: `const VkFlags validUsageMask = 0x7F;`
-- **Target**: `const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;`
-- **Risk**: None. `VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR = 0x40`, so `(0x40 << 1) - 1 = 0x7F`. Identical result today, but self-updating if new flags are added above this bit.
-
-### L16 — Wasteful temporary allocation in `deep_copy_tensor_desc` usage
-
-- **File**: `src/ml_graph.c:319-363`
-- **Current**: Three loops (inputs, outputs, weights) each call `deep_copy_tensor_desc()` which allocates a new `VkTensorDescriptionKHR` shell, then the caller does `graph->descs[i] = *copy; vk_ml_free(pAllocator, copy);` — allocating and immediately freeing the shell struct 3× per description.
-- **Target**: Add `deep_copy_tensor_desc_into(VkTensorDescriptionKHR *dst, const VkTensorDescriptionKHR *src, const VkAllocationCallbacks *pAllocator)` that copies directly into `dst`, skipping the shell allocation. The existing `deep_copy_tensor_desc()` remains for callers that need an allocated copy (node bindings at line 143).
-- **Risk**: Medium-low. Must preserve identical deep-copy semantics (pNext=NULL, pDimensions copy, pStrides copy). Must handle OOM identically. The existing function at line 22 remains unchanged for backward compat with the node binding use case.
-
-### L17 — Test files use relative paths for `vk_ml_validation.h`
-
-- **Files**: `tests/validation/test_vuids.c:6`, `tests/unit/test_dag_validation.c:8`, `tests/unit/test_descriptor_validation.c:7`
-- **Current**: All use `#include "../../layers/validation/vk_ml_validation.h"`
-- **Target**: `#include "vk_ml_validation.h"` (CMake already provides the include directory for all three targets)
-- **Bonus**: `test_dag_validation.c:11-12` and `test_descriptor_validation.c:12` have redundant `extern` declarations for `vk_ml_populate_features`/`vk_ml_populate_properties` that are already in `internal.h` (included). Remove them.
-- **Risk**: None. CMake `target_include_directories` already configured correctly for all three targets.
-
-### L18 — Memory requirement functions don't clear `pNext`
-
-- **Files**: `src/tensor.c:122`, `src/ml_graph.c:417`
-- **Current**: Both set `sType` and `memoryRequirements` but leave `pNext` untouched
-- **Target**: Add `pMemoryRequirements->pNext = NULL;` after setting `sType` in both functions
-- **Risk**: None. Defensive initialization. Callers that chain `pNext` do so before the call and expect it to be preserved — but Vulkan convention for output-only structs is to write all fields. This is an output struct, not input/output.
-
-## Affected Files
-
-```text
-README.md                                          L12 — doc fix
-layers/validation/vk_ml_validation.h               L13 — remove stdbool.h
-CMakeLists.txt                                     L14 — move example out of BUILD_TESTING
-layers/validation/tensor_validation.c              L15 — derive usage mask from enum
-src/ml_graph.c                                     L16 — add copy-in-place helper, L18 — clear pNext
-src/tensor.c                                       L18 — clear pNext
-tests/validation/test_vuids.c                      L17 — fix include path
-tests/unit/test_dag_validation.c                   L17 — fix include path + remove externs
-tests/unit/test_descriptor_validation.c            L17 — fix include path + remove extern
-```
-
-## Test Plan
-
-No new tests required — these are non-behavioral changes. Validation:
-
-1. **Build**: `cmake --build build` — zero warnings
-2. **Tests**: `ctest --output-on-failure` — all 13 tests pass
-3. **Manual verification**: Confirm `cmake -B build -S . -DBUILD_TESTING=OFF` still builds the quickstart example (L14 validation)
+**Gate result**: PASS with justified violations. All violations are the *reason* for this plan — they are being fixed, not introduced.
 
 ## Project Structure
 
-No new files or directories. All changes are in existing files.
+### Documentation (this feature)
 
 ```text
 specs/001-ml-primitives/
 ├── plan.md              # This file
-└── tasks.md             # Phase 50 tasks (generated by /speckit.tasks)
+├── v1.0-readiness.plan.md  # Detailed fix plan (35 items, 6 phases)
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
+├── contracts/           # Phase 1 output (public API contract)
+└── tasks.md             # Phase 2 output (generated by /speckit.tasks)
 ```
+
+### Source Code (repository root)
+
+```text
+include/vulkan/
+└── vulkan_ml_primitives.h     Public C header (types, enums, prototypes)
+
+src/
+├── internal.h                 Internal shared declarations, VUID defines
+├── tensor.c                   VkTensorKHR create/destroy/memory
+├── tensor_view.c              VkTensorViewKHR create/destroy
+├── tensor_copy.c              vkCmdCopyTensorKHR
+├── ml_primitives.c            Primitive descriptor validation/setup
+├── ml_graph.c                 VkMLGraphKHR create/destroy/memory query
+├── ml_session.c               VkMLSessionKHR create/destroy
+├── ml_dispatch.c              vkCmdDispatchMLGraphKHR
+└── feature_query.c            Feature/property query entry points
+
+layers/validation/
+├── vk_ml_validation.h         Validation layer shared header
+├── tensor_validation.c        VUID checks for tensor operations
+├── graph_validation.c         VUID checks for graph + primitive descriptors
+├── session_validation.c       VUID checks for session operations
+├── dispatch_validation.c      VUID checks for dispatch operations
+└── barrier_validation.c       Tensor memory barrier validation
+
+tests/
+├── cts/                       10 conformance test executables
+├── validation/test_vuids.c    VUID negative tests
+└── unit/                      3 unit test executables
+
+cmake/                         Package config templates
+.github/workflows/ci.yml       CI pipeline
+```
+
+**Structure Decision**: Existing structure is retained. No new directories or architectural changes. All fixes are modifications to existing files or additions of test functions within existing test files.
+
+## Complexity Tracking
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| C5 DFS guard uses static limit (256) instead of dynamic alloc | Keeps stack-allocated fast path for 1.0; reference ICD already caps at 256 | Dynamic alloc adds complexity and a new OOM path for a limit that matches the ICD's own cap |
+| Phase 1 sType reassignment changes numeric values | Pre-1.0, no published consumers; collisions are a correctness bug, not a compatibility break | Keeping colliding values is not an option — it violates Constitution II |

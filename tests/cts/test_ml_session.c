@@ -201,6 +201,66 @@ static int test_session_destroy_null(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* T039: Scratch memory validation                                     */
+/* ------------------------------------------------------------------ */
+
+static int test_scratch_size_zero_with_memory(void)
+{
+    VkMLGraphKHR graph = create_minimal_graph();
+    if (graph == VK_NULL_HANDLE)
+        return 1;
+
+    VkMLSessionCreateInfoKHR session_info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .graph = graph,
+        .scratchMemory = MOCK_SCRATCH_MEMORY,
+        .scratchMemoryOffset = 0,
+        .scratchMemorySize = 0,
+    };
+
+    VkMLSessionKHR session = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLSessionKHR(VK_NULL_HANDLE, &session_info, NULL, &session);
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    if (session != VK_NULL_HANDLE)
+        vkDestroyMLSessionKHR(VK_NULL_HANDLE, session, NULL);
+
+    return (r != VK_SUCCESS) ? 0 : 1;
+}
+
+static int test_scratch_offset_unaligned(void)
+{
+    VkMLGraphKHR graph = create_minimal_graph();
+    if (graph == VK_NULL_HANDLE)
+        return 1;
+
+    VkMemoryRequirements2 mem_req = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetMLGraphMemoryRequirementsKHR(VK_NULL_HANDLE, graph, &mem_req);
+
+    VkMLSessionCreateInfoKHR session_info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .graph = graph,
+        .scratchMemory = MOCK_SCRATCH_MEMORY,
+        .scratchMemoryOffset = 7,
+        .scratchMemorySize = mem_req.memoryRequirements.size,
+    };
+
+    VkMLSessionKHR session = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLSessionKHR(VK_NULL_HANDLE, &session_info, NULL, &session);
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    if (session != VK_NULL_HANDLE)
+        vkDestroyMLSessionKHR(VK_NULL_HANDLE, session, NULL);
+
+    return (r != VK_SUCCESS) ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ */
 /* NULL pointer argument tests                                         */
 /* ------------------------------------------------------------------ */
 
@@ -238,6 +298,8 @@ int main(void)
     RUN_TEST(test_session_destroy);
     RUN_TEST(test_session_destroy_null);
     RUN_TEST(test_create_session_null_args);
+    RUN_TEST(test_scratch_size_zero_with_memory);
+    RUN_TEST(test_scratch_offset_unaligned);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);

@@ -519,6 +519,59 @@ static int test_create_tensor_null_args(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* T035: NULL handle rejection in tensor bind                          */
+/* ------------------------------------------------------------------ */
+
+static int test_bind_null_tensor_handle(void)
+{
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = VK_NULL_HANDLE,
+        .memory = (VkDeviceMemory)(uintptr_t)0x1,
+        .memoryOffset = 0,
+    };
+    VkResult r = vkBindTensorMemoryKHR(VK_NULL_HANDLE, 1, &bindInfo);
+    return (r == VK_ERROR_UNKNOWN) ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* T040: Tensor sType validation                                       */
+/* ------------------------------------------------------------------ */
+
+static int test_create_tensor_wrong_stype(void)
+{
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)0x12345678,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, &tensor);
+    if (r != VK_ERROR_UNKNOWN)
+        return 1;
+    if (tensor != VK_NULL_HANDLE)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -535,6 +588,8 @@ int main(void)
     RUN_TEST(test_tensor_concurrent_sharing);
     RUN_TEST(test_tensor_linear_tiling_with_strides);
     RUN_TEST(test_create_tensor_null_args);
+    RUN_TEST(test_bind_null_tensor_handle);
+    RUN_TEST(test_create_tensor_wrong_stype);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);

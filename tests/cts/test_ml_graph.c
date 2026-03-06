@@ -10,6 +10,7 @@
 #include "internal.h"
 #include "test_helpers.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int g_fail_count = 0;
@@ -1995,6 +1996,336 @@ static int test_graph_node_name_deep_copy(void)
 /* NULL pointer argument tests                                         */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* T038: Concat with descriptor                                        */
+/* ------------------------------------------------------------------ */
+
+static int test_concat_with_descriptor(void)
+{
+    uint32_t in1_dims[] = {1, 32, 56, 56};
+    uint32_t in2_dims[] = {1, 32, 56, 56};
+    uint32_t out_dims[] = {1, 64, 56, 56};
+    VkTensorDescriptionKHR in1_desc, in2_desc, out_desc;
+    make_tensor_desc(&in1_desc, in1_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&in2_desc, in2_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, out_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    VkMLPrimitiveDescConcatKHR concat_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR,
+        .pNext = NULL,
+        .axis = 1,
+    };
+
+    VkMLTensorBindingKHR inputs[2];
+    VkMLTensorBindingKHR outputs[1];
+    make_tensor_binding_external_input(&inputs[0], 0, &in1_desc);
+    make_tensor_binding_external_input(&inputs[1], 1, &in2_desc);
+    make_tensor_binding_external_output(&outputs[0], 0, &out_desc);
+
+    VkMLGraphNodeCreateInfoKHR node = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .operationType = VK_ML_OPERATION_TYPE_CONCAT_KHR,
+        .pOperationDesc = &concat_desc,
+        .inputCount = 2, .pInputs = inputs,
+        .outputCount = 1, .pOutputs = outputs,
+        .pNodeName = "concat_desc",
+    };
+
+    VkTensorDescriptionKHR ext_in[] = {in1_desc, in2_desc};
+    VkTensorDescriptionKHR ext_out[] = {out_desc};
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL, .flags = 0,
+        .nodeCount = 1, .pNodes = &node,
+        .externalInputCount = 2, .pExternalInputDescriptions = ext_in,
+        .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+        .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+    if (r != VK_SUCCESS || graph == VK_NULL_HANDLE)
+        return 1;
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* T038: Reshape with descriptor                                       */
+/* ------------------------------------------------------------------ */
+
+static int test_reshape_with_descriptor(void)
+{
+    uint32_t in_dims[] = {1, 64, 56, 56};
+    uint32_t out_dims[] = {1, 64, 3136};
+    VkTensorDescriptionKHR in_desc, out_desc;
+    make_tensor_desc(&in_desc, in_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, out_dims, 3, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    uint32_t reshape_out[] = {1, 64, 3136};
+    VkMLPrimitiveDescReshapeKHR reshape_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR,
+        .pNext = NULL,
+        .dimensionCount = 3,
+        .pOutputDimensions = reshape_out,
+    };
+
+    VkMLTensorBindingKHR inputs[1], outputs[1];
+    make_tensor_binding_external_input(&inputs[0], 0, &in_desc);
+    make_tensor_binding_external_output(&outputs[0], 0, &out_desc);
+
+    VkMLGraphNodeCreateInfoKHR node = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .operationType = VK_ML_OPERATION_TYPE_RESHAPE_KHR,
+        .pOperationDesc = &reshape_desc,
+        .inputCount = 1, .pInputs = inputs,
+        .outputCount = 1, .pOutputs = outputs,
+        .pNodeName = "reshape_desc",
+    };
+
+    VkTensorDescriptionKHR ext_in[] = {in_desc};
+    VkTensorDescriptionKHR ext_out[] = {out_desc};
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL, .flags = 0,
+        .nodeCount = 1, .pNodes = &node,
+        .externalInputCount = 1, .pExternalInputDescriptions = ext_in,
+        .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+        .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+    if (r != VK_SUCCESS || graph == VK_NULL_HANDLE)
+        return 1;
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* T038: Transpose with descriptor                                     */
+/* ------------------------------------------------------------------ */
+
+static int test_transpose_with_descriptor(void)
+{
+    uint32_t in_dims[] = {1, 64, 56, 56};
+    uint32_t out_dims[] = {1, 56, 56, 64};
+    VkTensorDescriptionKHR in_desc, out_desc;
+    make_tensor_desc(&in_desc, in_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, out_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    uint32_t perm[] = {0, 2, 3, 1};
+    VkMLPrimitiveDescTransposeKHR transpose_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR,
+        .pNext = NULL,
+        .dimensionCount = 4,
+        .pPermutation = perm,
+    };
+
+    VkMLTensorBindingKHR inputs[1], outputs[1];
+    make_tensor_binding_external_input(&inputs[0], 0, &in_desc);
+    make_tensor_binding_external_output(&outputs[0], 0, &out_desc);
+
+    VkMLGraphNodeCreateInfoKHR node = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .operationType = VK_ML_OPERATION_TYPE_TRANSPOSE_KHR,
+        .pOperationDesc = &transpose_desc,
+        .inputCount = 1, .pInputs = inputs,
+        .outputCount = 1, .pOutputs = outputs,
+        .pNodeName = "transpose_desc",
+    };
+
+    VkTensorDescriptionKHR ext_in[] = {in_desc};
+    VkTensorDescriptionKHR ext_out[] = {out_desc};
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL, .flags = 0,
+        .nodeCount = 1, .pNodes = &node,
+        .externalInputCount = 1, .pExternalInputDescriptions = ext_in,
+        .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+        .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+    if (r != VK_SUCCESS || graph == VK_NULL_HANDLE)
+        return 1;
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* T038: Resize with descriptor                                        */
+/* ------------------------------------------------------------------ */
+
+static int test_resize_with_descriptor(void)
+{
+    uint32_t in_dims[] = {1, 64, 56, 56};
+    uint32_t out_dims[] = {1, 64, 112, 112};
+    VkTensorDescriptionKHR in_desc, out_desc;
+    make_tensor_desc(&in_desc, in_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, out_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    VkMLPrimitiveDescResizeKHR resize_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR,
+        .pNext = NULL,
+        .mode = VK_ML_RESIZE_MODE_BILINEAR_KHR,
+        .scaleHeight = 2.0f,
+        .scaleWidth = 2.0f,
+    };
+
+    VkMLTensorBindingKHR inputs[1], outputs[1];
+    make_tensor_binding_external_input(&inputs[0], 0, &in_desc);
+    make_tensor_binding_external_output(&outputs[0], 0, &out_desc);
+
+    VkMLGraphNodeCreateInfoKHR node = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .operationType = VK_ML_OPERATION_TYPE_RESIZE_KHR,
+        .pOperationDesc = &resize_desc,
+        .inputCount = 1, .pInputs = inputs,
+        .outputCount = 1, .pOutputs = outputs,
+        .pNodeName = "resize_desc",
+    };
+
+    VkTensorDescriptionKHR ext_in[] = {in_desc};
+    VkTensorDescriptionKHR ext_out[] = {out_desc};
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL, .flags = 0,
+        .nodeCount = 1, .pNodes = &node,
+        .externalInputCount = 1, .pExternalInputDescriptions = ext_in,
+        .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+        .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+    if (r != VK_SUCCESS || graph == VK_NULL_HANDLE)
+        return 1;
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* T043: Deep-copy of Reshape/Transpose descriptors                    */
+/* ------------------------------------------------------------------ */
+
+static int test_reshape_transpose_deep_copy(void)
+{
+    uint32_t in_dims[] = {1, 64, 56, 56};
+    uint32_t mid_dims[] = {1, 64, 3136};
+    uint32_t out_dims[] = {64, 3136, 1};
+    VkTensorDescriptionKHR in_desc, mid_desc, out_desc;
+    make_tensor_desc(&in_desc, in_dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&mid_desc, mid_dims, 3, VK_FORMAT_R16_SFLOAT, 0);
+    make_tensor_desc(&out_desc, out_dims, 3, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    /* Heap-allocate arrays that will be freed before graph destroy */
+    uint32_t *reshape_dims = (uint32_t *)malloc(3 * sizeof(uint32_t));
+    if (!reshape_dims)
+        return 1;
+    reshape_dims[0] = 1; reshape_dims[1] = 64; reshape_dims[2] = 3136;
+
+    uint32_t *perm = (uint32_t *)malloc(3 * sizeof(uint32_t));
+    if (!perm) {
+        free(reshape_dims);
+        return 1;
+    }
+    perm[0] = 1; perm[1] = 2; perm[2] = 0;
+
+    VkMLPrimitiveDescReshapeKHR reshape_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR,
+        .pNext = NULL,
+        .dimensionCount = 3,
+        .pOutputDimensions = reshape_dims,
+    };
+
+    VkMLPrimitiveDescTransposeKHR transpose_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR,
+        .pNext = NULL,
+        .dimensionCount = 3,
+        .pPermutation = perm,
+    };
+
+    VkMLTensorBindingKHR reshape_in[1], reshape_out[1];
+    make_tensor_binding_external_input(&reshape_in[0], 0, &in_desc);
+    make_tensor_binding_internal(&reshape_out[0], 0, 0, &mid_desc);
+
+    VkMLTensorBindingKHR transpose_in[1], transpose_out[1];
+    make_tensor_binding_internal(&transpose_in[0], 0, 0, &mid_desc);
+    make_tensor_binding_external_output(&transpose_out[0], 0, &out_desc);
+
+    VkMLGraphNodeCreateInfoKHR nodes[2] = {
+        {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_RESHAPE_KHR,
+            .pOperationDesc = &reshape_desc,
+            .inputCount = 1, .pInputs = reshape_in,
+            .outputCount = 1, .pOutputs = reshape_out,
+            .pNodeName = "reshape",
+        },
+        {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_TRANSPOSE_KHR,
+            .pOperationDesc = &transpose_desc,
+            .inputCount = 1, .pInputs = transpose_in,
+            .outputCount = 1, .pOutputs = transpose_out,
+            .pNodeName = "transpose",
+        },
+    };
+
+    VkTensorDescriptionKHR ext_in[] = {in_desc};
+    VkTensorDescriptionKHR ext_out[] = {out_desc};
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL, .flags = 0,
+        .nodeCount = 2, .pNodes = nodes,
+        .externalInputCount = 1, .pExternalInputDescriptions = ext_in,
+        .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+        .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+    if (r != VK_SUCCESS || graph == VK_NULL_HANDLE) {
+        free(perm);
+        free(reshape_dims);
+        return 1;
+    }
+
+    /* Destroy source data; graph should survive via deep copy */
+    memset(reshape_dims, 0xFF, 3 * sizeof(uint32_t));
+    memset(perm, 0xFF, 3 * sizeof(uint32_t));
+    free(reshape_dims);
+    free(perm);
+
+    VkMemoryRequirements2 mem_req = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetMLGraphMemoryRequirementsKHR(VK_NULL_HANDLE, graph, &mem_req);
+
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
 static int test_create_graph_null_args(void)
 {
     VkMLGraphCreateInfoKHR ci = {
@@ -2058,6 +2389,11 @@ int main(void)
     RUN_TEST(test_graph_node_null_desc_ops);
     RUN_TEST(test_graph_node_name_deep_copy);
     RUN_TEST(test_create_graph_null_args);
+    RUN_TEST(test_concat_with_descriptor);
+    RUN_TEST(test_reshape_with_descriptor);
+    RUN_TEST(test_transpose_with_descriptor);
+    RUN_TEST(test_resize_with_descriptor);
+    RUN_TEST(test_reshape_transpose_deep_copy);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);

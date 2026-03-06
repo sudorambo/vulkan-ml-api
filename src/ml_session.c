@@ -21,10 +21,19 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
     if (pCreateInfo->graph == VK_NULL_HANDLE)
         return VK_ERROR_UNKNOWN;
 
+    if (pCreateInfo->scratchMemory != VK_NULL_HANDLE) {
+        if (pCreateInfo->scratchMemorySize == 0)
+            return VK_ERROR_INITIALIZATION_FAILED;
+        if (pCreateInfo->scratchMemoryOffset % _Alignof(max_align_t) != 0)
+            return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
     VkMLSessionKHR_T *session = (VkMLSessionKHR_T *)vk_ml_alloc(pAllocator,
         sizeof(VkMLSessionKHR_T));
     if (!session)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
+
+    memset(session, 0, sizeof(*session));
 
     VkMLGraphKHR_T *g = (VkMLGraphKHR_T *)(uintptr_t)pCreateInfo->graph;
 

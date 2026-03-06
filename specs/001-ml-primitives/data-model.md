@@ -1,238 +1,203 @@
 # Data Model: VK_KHR_ml_primitives
 
-**Branch**: `001-ml-primitives` | **Date**: 2026-03-05
+**Plan**: [plan.md](plan.md) | **Date**: 2026-03-05
 
 ## Entity Overview
 
-```text
-VkPhysicalDevice
- └─ queries ──► VkPhysicalDeviceMLFeaturesKHR
- └─ queries ──► VkPhysicalDeviceMLPropertiesKHR
+The extension defines 4 Vulkan object types, 10 primitive descriptor types,
+and supporting structures for synchronization, dispatch, and configuration.
 
-VkDevice
- ├─ creates ──► VkTensorKHR ──► binds VkDeviceMemory
- │               └─ creates ──► VkTensorViewKHR
- ├─ creates ──► VkMLGraphKHR (from VkMLGraphNodeCreateInfoKHR[])
- │               └─ queries ──► VkMemoryRequirements2 (scratch)
- └─ creates ──► VkMLSessionKHR (binds VkMLGraphKHR + scratch memory)
-
-VkCommandBuffer
- ├─ records ──► vkCmdDispatchMLGraphKHR(VkMLSessionKHR, tensors)
- ├─ records ──► vkCmdCopyTensorKHR(src, dst, regions)
- └─ records ──► vkCmdPipelineBarrier2(VkTensorMemoryBarrierKHR via pNext)
 ```
-
----
+VkTensorKHR ──────────┐
+    │                  │
+    ▼                  │ bound via VkBindTensorMemoryInfoKHR
+VkTensorViewKHR        │
+    │                  ▼
+    │            VkDeviceMemory
+    │
+    ├── used as input/output/weight in ──▶ VkMLGraphDispatchInfoKHR
+    │
+    ▼
+VkMLGraphKHR ────────────────────────────▶ VkMLSessionKHR
+    │                                          │
+    ├── nodeCount × VkMLGraphNodeCreateInfoKHR  │
+    │       │                                   │
+    │       ├── VkMLPrimitiveDesc*KHR           │
+    │       └── VkMLTensorBindingKHR[]          │
+    │                                           │
+    ├── externalInputDescs[]                    │
+    ├── externalOutputDescs[]                   ▼
+    └── constantWeightDescs[]            vkCmdDispatchMLGraphKHR
+```
 
 ## Entities
 
-### VkTensorKHR
+### VkTensorKHR (Non-dispatchable handle)
 
 N-dimensional data container for ML workloads.
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| Handle | `VkTensorKHR` | Non-dispatchable. Unique per device. |
-| Description | `VkTensorDescriptionKHR` | Embedded via pointer in create info. |
-| Sharing Mode | `VkSharingMode` | EXCLUSIVE or CONCURRENT. |
-| Queue Families | `uint32_t[]` | Required if CONCURRENT; each unique, < queue family count. |
-| Bound Memory | `VkDeviceMemory` | Bound exactly once via `vkBindTensorMemoryKHR`. |
+| description | VkTensorDescriptionKHR | Copied at creation |
+| dimensions | uint32_t[] | Deep-copied; count = description.dimensionCount |
+| strides | VkDeviceSize[] | Deep-copied; NULL for optimal tiling |
+| sharingMode | VkSharingMode | EXCLUSIVE or CONCURRENT |
+| queueFamilyIndexCount | uint32_t | >= 2 when CONCURRENT |
+| queueFamilyIndices | uint32_t[] | Deep-copied |
+| boundMemory | VkDeviceMemory | VK_NULL_HANDLE until bound |
+| memoryOffset | VkDeviceSize | 0 until bound |
+| memoryBound | VkBool32 | VK_FALSE until bound; immutable after |
 
-**Lifecycle**: Create → Query Memory Requirements → Allocate Memory →
-Bind Memory → Use (dispatch/copy/shader) → Destroy.
-
-**Validation rules** (VUIDs):
-
-- `tensorObjects` feature MUST be enabled.
-- Device MUST have at least one queue.
-- Memory MUST NOT be bound twice.
-- Memory offset MUST be aligned to `minTensorMemoryAlignment`.
-- Memory type MUST be compatible with requirements.
-- All views MUST be destroyed before the tensor.
-- All submitted commands referencing the tensor MUST have completed.
-
----
-
-### VkTensorDescriptionKHR
-
-Describes geometry, format, layout, and usage of a tensor.
-
-| Field | Type | Constraints |
-|-------|------|-------------|
-| tiling | `VkTensorTilingKHR` | OPTIMAL or LINEAR. |
-| format | `VkFormat` | Single-component only. |
-| dimensionCount | `uint32_t` | 1 to `maxTensorDimensions`. |
-| pDimensions | `const uint32_t*` | Each > 0, each ≤ `maxTensorDimensionSize`. Product ≤ `maxTensorElements`. |
-| pStrides | `const VkDeviceSize*` | NULL for dense packing. MUST be NULL when tiling is OPTIMAL. Each stride multiple of element size. |
-| usage | `VkTensorUsageFlagsKHR` | Bitmask of: SHADER, TRANSFER_SRC, TRANSFER_DST, ML_GRAPH_INPUT, ML_GRAPH_OUTPUT, ML_GRAPH_WEIGHT, IMAGE_ALIASING. |
-
----
-
-### VkTensorViewKHR
-
-Typed sub-region view into a tensor.
-
-| Field | Type | Constraints |
-|-------|------|-------------|
-| Handle | `VkTensorViewKHR` | Non-dispatchable. |
-| tensor | `VkTensorKHR` | MUST be valid, MUST have memory bound. |
-| format | `VkFormat` | Element size MUST equal tensor's format element size. |
-| dimensionCount | `uint32_t` | MUST equal tensor's dimensionCount. |
-| pDimensionOffsets | `const uint32_t*` | Per-dimension offset. offset + size ≤ tensor dimension. |
-| pDimensionSizes | `const uint32_t*` | Per-dimension size of the view window. |
-
-**Lifecycle**: Create (from bound tensor) → Use → Destroy (before parent tensor).
-
----
-
-### VkMLGraphKHR
-
-Compiled directed acyclic graph of ML primitive operations. Immutable
-after creation.
-
-| Field | Type | Constraints |
-|-------|------|-------------|
-| Handle | `VkMLGraphKHR` | Non-dispatchable. |
-| nodeCount | `uint32_t` | > 0, ≤ `maxMLGraphNodeCount`. |
-| pNodes | `VkMLGraphNodeCreateInfoKHR[]` | MUST form a valid DAG. |
-| externalInputCount | `uint32_t` | > 0. |
-| externalOutputCount | `uint32_t` | > 0. |
-| constantWeightCount | `uint32_t` | ≥ 0. |
-| External descriptions | `VkTensorDescriptionKHR[]` | Shape/format for each external tensor. |
-
-**Lifecycle**: Create (compile) → Query Scratch Requirements → Create
-Sessions → Dispatch (N times) → Destroy Sessions → Destroy Graph.
+**Lifecycle**: Create → Query memory → Allocate → Bind → Use → Destroy
 
 **Validation rules**:
+- dimensionCount: 1–`maxTensorDimensions` (VUID_TENSOR_DESC_DIM_COUNT)
+- Each dimension: 1–`maxTensorDimensionSize` (VUID_TENSOR_DESC_DIM_VALUES)
+- Product of dimensions: ≤ `maxTensorElements` (VUID_TENSOR_DESC_DIM_PRODUCT)
+- Strides must be NULL for optimal tiling (VUID_TENSOR_DESC_STRIDES_OPTIMAL)
+- Strides must be aligned to element size (VUID_TENSOR_DESC_STRIDE_ALIGN)
+- Format must be supported (VUID_TENSOR_DESC_FORMAT)
+- Usage must be non-zero and within valid mask
+- sType must be VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR
 
-- `mlGraph` feature MUST be enabled.
-- Graph topology MUST be a DAG (no cycles).
-- All internal tensor edges MUST have compatible shapes/formats.
-- Node count MUST NOT exceed `maxMLGraphNodeCount`.
-- All submitted commands and sessions MUST be complete/destroyed first.
+### VkTensorViewKHR (Non-dispatchable handle)
 
----
-
-### VkMLGraphNodeCreateInfoKHR
-
-Defines a single node in the ML graph.
-
-| Field | Type | Constraints |
-|-------|------|-------------|
-| operationType | `VkMLOperationTypeKHR` | One of 21 operation types. |
-| pOperationDesc | `const void*` | Points to operation-specific descriptor. `sType` MUST match operation type. |
-| inputCount | `uint32_t` | Operation-dependent. |
-| pInputs | `VkMLTensorBindingKHR[]` | Tensor bindings for inputs (and weights). |
-| outputCount | `uint32_t` | Operation-dependent. |
-| pOutputs | `VkMLTensorBindingKHR[]` | Tensor bindings for outputs. |
-| pNodeName | `const char*` | Optional debug label. May be NULL. |
-
----
-
-### VkMLTensorBindingKHR
-
-Describes how a tensor is connected within the graph.
+Typed sub-region view into a VkTensorKHR.
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| bindingType | `VkMLTensorBindingTypeKHR` | INTERNAL, EXTERNAL_INPUT, EXTERNAL_OUTPUT, or EXTERNAL_WEIGHT. |
-| nodeIndex | `uint32_t` | Producer node index (for INTERNAL only). |
-| tensorIndex | `uint32_t` | Output slot of producer (INTERNAL) or index into external description array (EXTERNAL_*). |
-| pTensorDescription | `const VkTensorDescriptionKHR*` | MUST be consistent with referenced location. |
+| tensor | VkTensorKHR | Parent; must have memory bound |
+| format | VkFormat | Same element size as parent |
+| dimensionCount | uint32_t | Must match parent |
+| dimensionOffsets | uint32_t[] | Deep-copied |
+| dimensionSizes | uint32_t[] | Deep-copied |
 
----
+**Lifecycle**: Create (parent must have memory bound) → Use → Destroy (before parent)
 
-### VkMLSessionKHR
+**Validation rules**:
+- Parent tensor must have memory bound (VUID_TENSOR_VIEW_MEMORY_BOUND)
+- Format element size must match parent (VUID_TENSOR_VIEW_FORMAT)
+- dimensionCount must match parent (VUID_TENSOR_VIEW_DIM_COUNT)
+- offset[i] + size[i] ≤ parentDim[i] for all i, **overflow-safe** (VUID_TENSOR_VIEW_RANGE)
+- sType must be VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR
 
-Execution context for ML graph dispatch.
+### VkMLGraphKHR (Non-dispatchable handle)
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| Handle | `VkMLSessionKHR` | Non-dispatchable. |
-| graph | `VkMLGraphKHR` | MUST be valid. Created on same device. |
-| scratchMemory | `VkDeviceMemory` | May be VK_NULL_HANDLE if `mlGraphScratchAutoAllocation` enabled. |
-| scratchMemoryOffset | `VkDeviceSize` | Offset within scratch allocation. |
-| scratchMemorySize | `VkDeviceSize` | MUST be ≥ graph scratch requirement. |
-
-**Lifecycle**: Create (bind graph + scratch) → Dispatch (N times via
-command buffers) → Destroy (after all dispatches complete).
-
----
-
-### ML Primitive Descriptors
-
-Six descriptor structure types, each with `sType`/`pNext`:
-
-| Descriptor | Applies To | Key Parameters |
-|------------|-----------|----------------|
-| `VkMLPrimitiveDescConvolutionKHR` | CONVOLUTION_2D, DECONVOLUTION_2D | inputLayout, kernel size, stride, dilation, padding, groupCount, fusedActivation |
-| `VkMLPrimitiveDescGemmKHR` | GEMM, FULLY_CONNECTED | transposeA/B, alpha, beta, fusedActivation |
-| `VkMLPrimitiveDescPoolingKHR` | MAX_POOL_2D, AVERAGE_POOL_2D, GLOBAL_AVERAGE_POOL | poolType, window size, stride, padding |
-| `VkMLPrimitiveDescActivationKHR` | RELU, SIGMOID, TANH, LEAKY_RELU, PRELU, SOFTMAX | activationType, param0, param1 |
-| `VkMLPrimitiveDescNormalizationKHR` | BATCH_NORMALIZATION, LRN | normType, epsilon, fusedActivation |
-| `VkMLPrimitiveDescElementwiseKHR` | ELEMENTWISE_ADD, ELEMENTWISE_MUL | opType, fusedActivation |
-
-Operations without dedicated descriptors (CONCAT, RESHAPE, TRANSPOSE,
-RESIZE) use `pOperationDesc = NULL` with shape information inferred
-from tensor bindings.
-
----
-
-### VkTensorMemoryBarrierKHR
-
-Synchronization primitive for tensor access ordering.
+Compiled DAG of ML primitive operations. Immutable after creation.
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| srcAccessMask | `VkAccessFlags2` | ML_GRAPH_READ/WRITE, SHADER_READ/WRITE, TRANSFER_READ/WRITE. |
-| dstAccessMask | `VkAccessFlags2` | Same set. |
-| srcQueueFamilyIndex | `uint32_t` | Queue family or VK_QUEUE_FAMILY_IGNORED. |
-| dstQueueFamilyIndex | `uint32_t` | Queue family or VK_QUEUE_FAMILY_IGNORED. |
-| tensor | `VkTensorKHR` | MUST be valid. |
+| nodeCount | uint32_t | 1–`maxMLGraphNodeCount` |
+| nodes | VkMLGraphNodeCreateInfoKHR[] | Deep-copied with all pointer members |
+| externalInputCount | uint32_t | ≥ 1 |
+| externalInputDescs | VkTensorDescriptionKHR[] | Deep-copied |
+| externalOutputCount | uint32_t | ≥ 1 |
+| externalOutputDescs | VkTensorDescriptionKHR[] | Deep-copied |
+| constantWeightCount | uint32_t | ≥ 0 |
+| constantWeightDescs | VkTensorDescriptionKHR[] | Deep-copied |
+| scratchMemorySize | VkDeviceSize | Computed from tensor desc sizes |
 
-Chained into `VkDependencyInfo::pNext` via `VkTensorDependencyInfoKHR`.
+**Lifecycle**: Create → Query scratch requirements → Create session(s) → Destroy (after all sessions)
 
----
+**Validation rules**:
+- nodeCount > 0, ≤ maxMLGraphNodeCount (VUID_ML_GRAPH_NODE_COUNT)
+- DAG must be acyclic (VUID_ML_GRAPH_DAG)
+- externalInputCount > 0 (VUID_ML_GRAPH_INPUT_COUNT)
+- externalOutputCount > 0 (VUID_ML_GRAPH_OUTPUT_COUNT)
+- Per-node descriptors must be valid for their operation type
+- mlGraph feature must be enabled (VUID_ML_GRAPH_FEATURE)
 
-## Enumerations
+**Deep copy requirements** (v1.0 fixes):
+- `op_desc_size_by_stype()` must handle all 10 descriptor sTypes
+- Reshape (`pOutputDimensions`) and transpose (`pPermutation`) need pointer deep-copy
 
-| Enum | Values | Description |
-|------|--------|-------------|
-| `VkTensorTilingKHR` | OPTIMAL, LINEAR | Memory layout strategy. |
-| `VkTensorUsageFlagBitsKHR` | SHADER, TRANSFER_SRC/DST, ML_GRAPH_INPUT/OUTPUT/WEIGHT, IMAGE_ALIASING | Tensor usage intent. |
-| `VkMLOperationTypeKHR` | 21 values (0-20) | ML primitive type. |
-| `VkMLActivationFunctionKHR` | NONE, RELU, SIGMOID, TANH, LEAKY_RELU, CLAMP | Fused activation type. |
-| `VkMLPaddingModeKHR` | VALID, SAME, EXPLICIT | Padding strategy. |
-| `VkMLTensorLayoutKHR` | NCHW, NHWC, NDHWC | Tensor dimension ordering. |
-| `VkMLTensorBindingTypeKHR` | INTERNAL, EXTERNAL_INPUT, EXTERNAL_OUTPUT, EXTERNAL_WEIGHT | Graph edge type. |
+### VkMLSessionKHR (Non-dispatchable handle)
+
+Execution context for ML graph dispatches.
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| graph | VkMLGraphKHR | Must be valid handle |
+| scratchMemory | VkDeviceMemory | User-provided or auto-allocated |
+| scratchMemoryOffset | VkDeviceSize | Aligned to minTensorMemoryAlignment |
+| scratchMemorySize | VkDeviceSize | ≥ graph.scratchMemorySize |
+| autoAllocated | VkBool32 | Tracks ownership for cleanup |
+
+**Lifecycle**: Create (with graph + scratch) → Dispatch → Destroy (before graph)
+
+**Validation rules**:
+- graph must not be VK_NULL_HANDLE (VUID_SESSION_GRAPH_VALID)
+- If scratch is explicit: size ≥ required (VUID_SESSION_SCRATCH_SIZE)
+- If scratch is explicit: offset aligned (VUID_SESSION_SCRATCH_OFFSET_ALIGN)
+- If scratch is VK_NULL_HANDLE: mlGraphScratchAutoAllocation required (VUID_SESSION_SCRATCH_AUTO)
+- **v1.0 fix**: struct must be zero-initialized after allocation
+
+## Primitive Descriptor Types
+
+| sType Enum | Struct | Operation Types |
+|-----------|--------|-----------------|
+| ML_PRIMITIVE_DESC_CONVOLUTION_KHR (1000559014) | VkMLPrimitiveDescConvolutionKHR | CONVOLUTION_2D, DECONVOLUTION_2D |
+| ML_PRIMITIVE_DESC_GEMM_KHR (1000559015) | VkMLPrimitiveDescGemmKHR | GEMM, FULLY_CONNECTED |
+| ML_PRIMITIVE_DESC_POOLING_KHR (1000559016) | VkMLPrimitiveDescPoolingKHR | MAX_POOL_2D, AVERAGE_POOL_2D, GLOBAL_AVERAGE_POOL |
+| ML_PRIMITIVE_DESC_ACTIVATION_KHR (1000559017) | VkMLPrimitiveDescActivationKHR | RELU, SIGMOID, TANH, LEAKY_RELU, PRELU, SOFTMAX |
+| ML_PRIMITIVE_DESC_NORMALIZATION_KHR (1000559018) | VkMLPrimitiveDescNormalizationKHR | BATCH_NORMALIZATION, LRN |
+| ML_PRIMITIVE_DESC_ELEMENTWISE_KHR (1000559019) | VkMLPrimitiveDescElementwiseKHR | ELEMENTWISE_ADD, ELEMENTWISE_MUL |
+| ML_PRIMITIVE_DESC_CONCAT_KHR (1000559020) | VkMLPrimitiveDescConcatKHR | CONCAT |
+| ML_PRIMITIVE_DESC_RESHAPE_KHR (1000559021) | VkMLPrimitiveDescReshapeKHR | RESHAPE |
+| ML_PRIMITIVE_DESC_TRANSPOSE_KHR (1000559022) | VkMLPrimitiveDescTransposeKHR | TRANSPOSE |
+| ML_PRIMITIVE_DESC_RESIZE_KHR (1000559023) | VkMLPrimitiveDescResizeKHR | RESIZE |
+
+## VkStructureType Registry (v1.0 corrected)
+
+| Value | Name | Status |
+|-------|------|--------|
+| 1000559000 | PHYSICAL_DEVICE_ML_FEATURES_KHR | Stable |
+| 1000559001 | PHYSICAL_DEVICE_ML_PROPERTIES_KHR | Stable |
+| 1000559002 | TENSOR_CREATE_INFO_KHR | Stable |
+| 1000559003 | TENSOR_DESCRIPTION_KHR | Stable |
+| 1000559004 | TENSOR_VIEW_CREATE_INFO_KHR | Stable |
+| 1000559005 | TENSOR_MEMORY_BARRIER_KHR | Stable |
+| 1000559006 | TENSOR_MEMORY_REQUIREMENTS_INFO_KHR | Stable |
+| 1000559007 | BIND_TENSOR_MEMORY_INFO_KHR | Stable |
+| 1000559008 | WRITE_DESCRIPTOR_SET_TENSOR_KHR | Stable |
+| 1000559009 | TENSOR_FORMAT_PROPERTIES_KHR | Stable |
+| 1000559010 | COPY_TENSOR_INFO_KHR | Stable |
+| 1000559011 | ML_GRAPH_CREATE_INFO_KHR | Stable |
+| 1000559012 | ML_GRAPH_NODE_CREATE_INFO_KHR | Stable |
+| 1000559013 | ML_SESSION_CREATE_INFO_KHR | Stable |
+| 1000559014 | ML_PRIMITIVE_DESC_CONVOLUTION_KHR | Stable |
+| 1000559015 | ML_PRIMITIVE_DESC_GEMM_KHR | Stable |
+| 1000559016 | ML_PRIMITIVE_DESC_POOLING_KHR | Stable |
+| 1000559017 | ML_PRIMITIVE_DESC_ACTIVATION_KHR | Stable |
+| 1000559018 | ML_PRIMITIVE_DESC_NORMALIZATION_KHR | Stable |
+| 1000559019 | ML_PRIMITIVE_DESC_ELEMENTWISE_KHR | Stable |
+| 1000559020 | ML_PRIMITIVE_DESC_CONCAT_KHR | Stable |
+| 1000559021 | ML_PRIMITIVE_DESC_RESHAPE_KHR | Stable |
+| 1000559022 | ML_PRIMITIVE_DESC_TRANSPOSE_KHR | Stable |
+| 1000559023 | ML_PRIMITIVE_DESC_RESIZE_KHR | Stable |
+| 1000559024 | ML_GRAPH_DISPATCH_INFO_KHR | **REASSIGNED** (was 1000559020) |
+| 1000559025 | ML_TENSOR_BINDING_KHR | **REASSIGNED** (was 1000559021) |
+| 1000559026 | TENSOR_DEPENDENCY_INFO_KHR | **REASSIGNED** (was 1000559022) |
+| 1000559027 | TENSOR_COPY_KHR | **REASSIGNED** (was 1000559023) |
 
 ## State Transitions
 
-### Tensor State Machine
+### Tensor Lifecycle
 
-```text
-CREATED ─── vkBindTensorMemoryKHR ───► BOUND ─── vkDestroyTensorKHR ───► DESTROYED
-              (memory queryable)         (usable in dispatches,
-                                          copies, shaders, views)
+```
+CREATED ──bind memory──▶ BOUND ──use──▶ IN_USE ──idle──▶ BOUND ──destroy──▶ DESTROYED
+                                                                    │
+                                         ◀── views must be destroyed first ──┘
 ```
 
-### ML Graph State Machine
+### Graph Lifecycle
 
-```text
-COMPILED ─── vkGetMLGraphMemoryRequirementsKHR ───► QUERYABLE ───► DISPATCHED (N times)
-                                                                       │
-                                                            vkDestroyMLGraphKHR
-                                                                       │
-                                                                       ▼
-                                                                   DESTROYED
+```
+CREATED ──query scratch──▶ QUERYABLE ──create sessions──▶ IN_USE ──destroy sessions──▶ QUERYABLE ──destroy──▶ DESTROYED
 ```
 
-### ML Session State Machine
+### Session Lifecycle
 
-```text
-CREATED ─── vkCmdDispatchMLGraphKHR (recorded) ───► IN_USE ───► IDLE
-   │                                                              │
-   │         (submit → GPU complete)                              │
-   │                                                              │
-   └──────── vkDestroyMLSessionKHR ◄──────────────────────────────┘
+```
+CREATED ──dispatch──▶ IN_USE ──idle──▶ CREATED ──destroy──▶ DESTROYED
 ```

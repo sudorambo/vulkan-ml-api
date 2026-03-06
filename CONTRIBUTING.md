@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the VK_KHR_ml_primitives referenc
 
 ### Prerequisites
 
-- C17-compatible compiler (GCC 8+, Clang 6+, MSVC 2019+)
+- C17-compatible compiler (GCC 12+, Clang 15+, MSVC 2022+)
 - CMake 3.20+
 - Vulkan SDK 1.3+
 

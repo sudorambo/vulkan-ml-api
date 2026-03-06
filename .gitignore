@@ -49,3 +49,7 @@ Thumbs.db
 *.gcov
 lcov.info
 coverage/
+
+# Doxygen
+docs/html/
+docs/latex/

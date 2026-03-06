@@ -1,189 +1,172 @@
-# Research: VK_KHR_ml_primitives
+# Research: v1.0 Release Readiness
 
-**Branch**: `001-ml-primitives` | **Date**: 2026-03-05
+**Plan**: [plan.md](plan.md) | **Date**: 2026-03-05
 
-## Research Summary
+## R1: sType Value Assignment Strategy
 
-No NEEDS CLARIFICATION markers exist — the authoritative specification
-(`spec/VK_KHR_ml_primitives.adoc`) and project constitution fully define
-all technical decisions. This document records the rationale behind each
-key architectural choice and alternatives evaluated.
+**Question**: What is the correct approach for assigning new `VkStructureType`
+values to avoid collisions while staying within the extension's registered range?
 
----
+**Decision**: Assign the 4 colliding sTypes (dispatch info, tensor binding,
+dependency info, tensor copy) to the next sequential values in the extension's
+range: 1000559024–1000559027.
 
-## R-001: Object Model — Why New Object Types vs. Pipeline Extensions
-
-**Decision**: Introduce four new non-dispatchable handle types
-(`VkTensorKHR`, `VkTensorViewKHR`, `VkMLGraphKHR`, `VkMLSessionKHR`)
-rather than extending existing compute pipeline or buffer objects.
-
-**Rationale**: Tensors have N-dimensional semantics (up to 8D) with
-format, tiling, and ML-specific usage flags that do not map cleanly onto
-`VkBuffer` (1D, untyped) or `VkImage` (limited to 3D + layers). ML
-graphs require DAG compilation semantics absent from
-`VkComputePipeline`. Sessions manage scratch memory and transient state
-specific to graph execution.
+**Rationale**: Vulkan extensions receive a contiguous block of 1000 values
+starting at `1000000000 + (extensionNumber - 1) * 1000`. Extension number
+560 (0-indexed 559) gives range 1000559000–1000559999. Values 1000559000–
+1000559023 are already assigned. The next 4 available are 1000559024–27.
+Since this is pre-1.0 with no published consumers, reassignment is safe.
 
 **Alternatives considered**:
+- Reassign the *new* descriptor sTypes instead: rejected because the new
+  descriptors (concat/reshape/transpose/resize) were added more recently
+  and are less likely to have been used in external tests.
+- Use non-sequential values: rejected because sequential assignment is the
+  Vulkan convention and simplifies range accounting.
 
-- *Repurpose VkBuffer with metadata*: Rejected — loses type safety and
-  would require extensive `pNext` chains to carry dimension/format info
-  on every API call, violating Principle VII (simplicity).
-- *Extend VkImage to N-D*: Rejected — `VkImage` carries rendering
-  semantics (mipmaps, multisampling, layouts) irrelevant to ML tensors,
-  and 8D support would break existing image validation.
+## R2: Deep Copy Strategy for Pointer-Containing Descriptors
 
----
+**Question**: `VkMLPrimitiveDescReshapeKHR` has `pOutputDimensions` (pointer
+to `uint32_t[]`) and `VkMLPrimitiveDescTransposeKHR` has `pPermutation`
+(pointer to `uint32_t[]`). The existing `deep_copy_op_desc()` does a flat
+`memcpy`. How should these be handled?
 
-## R-002: Graph Compilation Model — Ahead-of-Time vs. JIT
+**Decision**: Extend `deep_copy_op_desc()` with post-copy logic that detects
+reshape and transpose sTypes and deep-copies their pointer members into
+separately allocated arrays, similar to how `deep_copy_tensor_desc()` handles
+`pDimensions` and `pStrides`.
 
-**Decision**: ML graphs are compiled once at creation time
-(`vkCreateMLGraphKHR`) and are immutable thereafter. Graph compilation
-is a potentially expensive operation that may be deferred to background
-threads via `VK_KHR_deferred_host_operations`.
-
-**Rationale**: Ahead-of-time compilation enables IHV-specific
-optimizations (operator fusion, memory planning, kernel selection)
-without per-frame cost. Immutability simplifies thread safety — a
-compiled graph can be shared across command buffers and sessions
-without synchronization.
-
-**Alternatives considered**:
-
-- *JIT compilation at first dispatch*: Rejected — unpredictable first-
-  frame latency violates the performance constraint (graph compilation
-  is setup-time, not per-frame).
-- *Mutable graphs*: Rejected — would require versioning, invalidation
-  tracking, and re-compilation triggers, adding complexity without
-  clear benefit (Principle VII).
-
----
-
-## R-003: Synchronization — Reuse Existing Primitives vs. New Ones
-
-**Decision**: Reuse `VkPipelineBarrier2` (with `VkTensorMemoryBarrierKHR`
-chained via `VkTensorDependencyInfoKHR::pNext`) and timeline semaphores
-for all synchronization. Introduce only a new pipeline stage
-(`VK_PIPELINE_STAGE_2_ML_GRAPH_BIT_KHR`) and access flags.
-
-**Rationale**: Constitution Principle VII mandates composability with
-existing Vulkan primitives. A new pipeline stage is the minimum addition
-needed to express ML-specific ordering. Everything else (barriers,
-semaphores, queue submission) reuses existing infrastructure.
+**Rationale**: The flat `memcpy` copies the pointer value, which becomes
+dangling if the caller frees the original. Since `vkCreateMLGraphKHR`
+documents that the `pCreateInfo` and all referenced memory may be freed
+after the call returns, deep copy is required for correctness.
 
 **Alternatives considered**:
+- Reference counting on the source arrays: rejected because Vulkan's
+  create/destroy model expects full ownership transfer at creation time.
+- Requiring callers to keep descriptor memory alive: rejected because it
+  violates Vulkan conventions where create info is consumed and may be freed.
 
-- *Dedicated ML fence type*: Rejected — timeline semaphores already
-  provide cross-queue signaling with monotonic values, covering all
-  ML synchronization needs.
-- *Implicit synchronization within sessions*: Rejected — violates
-  Vulkan's explicit synchronization philosophy and Principle V
-  (explicit lifecycle).
+## R3: Integer Overflow Prevention Pattern
 
----
+**Question**: What is the idiomatic C pattern for overflow-safe bounds
+checking of `uint32_t` addition in `offset + size <= limit`?
 
-## R-004: Tensor Memory Model — Application-Managed vs. Driver-Managed
+**Decision**: Rewrite as subtraction: `size > limit || offset > limit - size`.
+This avoids the overflow entirely because `limit - size` is valid when
+`size <= limit` (guaranteed by the first check).
 
-**Decision**: Application-managed memory as default (query requirements
-→ allocate → bind), with opt-in driver-managed scratch via the
-`mlGraphScratchAutoAllocation` feature flag.
-
-**Rationale**: Application-managed memory is the Vulkan norm for images
-and buffers, enabling suballocation, memory aliasing, and budget
-control. The opt-in auto-allocation path serves simpler use cases
-without violating the explicit-by-default model (Principle V).
+**Rationale**: This pattern is used extensively in the Vulkan validation
+layers (mesa, lvp) and in the CTS. It adds no branches beyond the original
+check and works for all `uint32_t` values including `UINT32_MAX`.
 
 **Alternatives considered**:
+- Cast to `uint64_t` for the addition: works but is less idiomatic and
+  adds unnecessary widening on 32-bit platforms.
+- Use compiler builtins (`__builtin_add_overflow`): not portable to MSVC
+  without `#ifdef` guards.
 
-- *Fully driver-managed tensor memory*: Rejected — removes application
-  control over memory budget and prevents suballocation strategies,
-  violating Principle V.
-- *No auto-allocation option*: Considered but rejected — scratch memory
-  management is boilerplate that adds friction without value for simple
-  inference scenarios.
+## R4: Stack vs Heap for DFS Color Array
 
----
+**Question**: The DFS cycle detection uses a stack-allocated `uint8_t color[256]`.
+Should this be changed to a heap allocation to support arbitrary `maxMLGraphNodeCount`?
 
-## R-005: Validation Layer Architecture
+**Decision**: For 1.0, add a guard that rejects graphs with `nodeCount > 256`
+in the validation layer. Keep the stack allocation.
 
-**Decision**: Implement validation as a separate Vulkan layer
-(`VK_LAYER_KHR_ml_validation`) that intercepts all ML extension entry
-points, validates parameters against VUIDs, and forwards to the ICD.
-
-**Rationale**: Standard Vulkan validation architecture. Separates
-correctness checking from implementation, enabling validation in
-debug builds without performance cost in release. Each VUID from the
-spec maps to a discrete check function.
+**Rationale**: The reference ICD's `VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT` is 256,
+which is the ICD's own hard limit. The validation layer using the same limit
+is consistent. A guard clause is simpler and avoids introducing a new OOM path
+in validation code. Post-1.0, if `maxMLGraphNodeCount` increases, dynamic
+allocation can be added.
 
 **Alternatives considered**:
+- `malloc`/`free` in the validation function: adds complexity, requires OOM
+  handling in a function that returns `VkBool32`, and the allocation is small
+  enough that stack is appropriate for the reference implementation's limits.
+- VLA (variable-length array): forbidden in C11 strict mode and dangerous
+  for large values.
 
-- *Inline validation in ICD*: Rejected — couples validation with
-  implementation, makes it impossible to disable for release builds,
-  and violates the layered architecture pattern.
+## R5: `(int)` Cast Removal for sType Comparisons
 
----
+**Question**: Multiple files cast `VkStructureType` to `(int)` before
+comparing with enum constants. Is this safe? What's the correct pattern?
 
-## R-006: Build System and Toolchain
+**Decision**: Remove the `(int)` cast. Compare directly as `uint32_t` using
+the pattern `(uint32_t)pCreateInfo->sType == (uint32_t)VK_STRUCTURE_TYPE_...`.
 
-**Decision**: CMake 3.20+ as the sole build system. Targets GCC 11+,
-Clang 14+, MSVC 2022+. CI runs `clang-tidy` and `cppcheck` with zero
-warnings enforced.
-
-**Rationale**: CMake is the de facto standard for Vulkan ecosystem
-projects (Vulkan-Loader, Vulkan-ValidationLayers, SPIRV-Tools all use
-CMake). The compiler matrix covers all target platforms. Static analysis
-tools are widely available and integrate with CMake via
-`CMAKE_EXPORT_COMPILE_COMMANDS`.
-
-**Alternatives considered**:
-
-- *Meson*: Rejected — lower adoption in the Vulkan ecosystem; would
-  create friction for contributors familiar with CMake.
-- *Bazel*: Rejected — heavy dependency, uncommon in graphics/Vulkan
-  projects.
-
----
-
-## R-007: Test Strategy
-
-**Decision**: Three-tier test structure: CTS (conformance), validation
-(VUID negative tests), and unit (internal logic). CTS tests query
-capabilities and skip gracefully. All tests run in CI.
-
-**Rationale**: Constitution Principle IV mandates test-first with
-validation layers. The three-tier structure maps to different failure
-modes: CTS verifies correct behavior, validation tests verify error
-detection, unit tests verify internal algorithms (DAG cycle detection,
-shape inference).
+**Rationale**: `VkStructureType` is defined as `uint32_t` in the Vulkan
+headers. The anonymous enum constants in `vulkan_ml_primitives.h` have
+values > 1 billion, which fit in `uint32_t` but technically exceed `INT_MAX`
+on most platforms (where `int` is 32-bit signed). Casting to `(int)` is
+implementation-defined behavior in C. The `(uint32_t)` cast is explicit
+and safe for all values in the `VkStructureType` range.
 
 **Alternatives considered**:
+- No cast at all: works in practice but some compilers warn about
+  signed/unsigned comparison between enum and `uint32_t`.
+- Define sTypes as `static const uint32_t` instead of anonymous enum:
+  would fix the root cause but is a larger refactor and diverges from
+  how the Vulkan SDK headers define extension sTypes.
 
-- *CTS-only testing*: Rejected — CTS tests correctness but not
-  error handling. VUID negative tests are separately required by
-  Principle IV.
-- *Property-based testing*: Considered as a supplement for shape
-  validation and tensor format compatibility. May be added in a
-  future iteration but not required for initial implementation.
+## R6: Activation Descriptor Validation Rules
 
----
+**Question**: What validation rules apply to `VkMLPrimitiveDescActivationKHR`
+that the current no-op case is missing?
 
-## R-008: SPIR-V Integration Approach
+**Decision**: Validate:
+1. `sType == VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR`
+2. `activationType` is within the valid enum range (0–5, i.e.
+   `<= VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR`)
+3. `param0` and `param1` are finite (`isfinite()`)
+4. For `LEAKY_RELU`: `param0` (alpha) must be finite and typically in (0, 1)
+5. For `CLAMP`: `param0 <= param1` (min <= max)
 
-**Decision**: Co-maintain `SPV_KHR_tensor` extension alongside the
-Vulkan extension. Tensor types and accessors (`OpTypeTensorKHR`,
-`OpTensorReadKHR`, `OpTensorWriteKHR`, `OpTensorQuerySizeKHR`) are
-defined in SPIR-V and mapped to GLSL via `GL_KHR_tensor`.
-
-**Rationale**: SPIR-V integration enables hybrid workloads where custom
-shaders and opaque ML primitives share tensor resources (FR-012). The
-tensor type system in SPIR-V mirrors the Vulkan tensor description,
-enabling zero-copy interop.
+**Rationale**: The ICD's `vk_ml_validate_primitive_desc` already checks
+finiteness for activation params (cases `VK_ML_OPERATION_TYPE_RELU_KHR`
+through `SOFTMAX_KHR`). The validation layer should additionally check
+the `activationType` enum range and semantic constraints (clamp ordering).
 
 **Alternatives considered**:
+- Only validate finiteness (matching ICD): insufficient for the validation
+  layer, which should catch more errors than the ICD.
+- Validate against device features: activation descriptors don't have a
+  fused activation field (they *are* the activation), so `fusedActivations`
+  feature doesn't apply here.
 
-- *Buffer-based shader access only*: Rejected — loses typed access and
-  multi-dimensional indexing. Would require manual stride calculations
-  in every shader.
-- *Image-based aliasing only*: Rejected — limited to formats and
-  dimensions supported by `VkImage`, missing 5D-8D tensors and ML-
-  specific formats (BF16, FP8).
+## R7: CMake NAMESPACE Impact on Downstream Projects
+
+**Question**: Adding `NAMESPACE vk_ml_primitives::` changes the imported
+target name. Does this break anything?
+
+**Decision**: Add the namespace. Update `vk_ml_primitivesConfig.cmake.in`
+to document the namespaced target name.
+
+**Rationale**: Pre-1.0, no published consumers exist. Adding the namespace
+now (before 1.0 freeze) is the right time. The namespace enables CMake's
+target name typo detection (`target_link_libraries(app PRIVATE vk_ml_primtives::vk_ml_primitives)` would fail at configure time instead of silently
+passing). This is a CMake best practice documented in the CMake packaging
+guide.
+
+**Alternatives considered**:
+- Skip namespace: simpler but loses the typo-detection benefit and diverges
+  from CMake packaging conventions.
+
+## R8: pkg-config Variable Strategy
+
+**Question**: Should `vk_ml_primitives.pc.in` use `@CMAKE_INSTALL_FULL_LIBDIR@`
+or `@CMAKE_INSTALL_LIBDIR@`?
+
+**Decision**: Use `@CMAKE_INSTALL_FULL_LIBDIR@` and
+`@CMAKE_INSTALL_FULL_INCLUDEDIR@` for absolute paths.
+
+**Rationale**: The `FULL` variants include the install prefix, producing
+correct absolute paths like `/usr/local/lib64` on Fedora. Without `FULL`,
+the value is a relative path like `lib64` which must be composed with
+`${prefix}`, but `${exec_prefix}` vs `${prefix}` handling varies across
+pkg-config implementations. Using absolute paths is simpler and more
+reliable.
+
+**Alternatives considered**:
+- Use `${exec_prefix}/@CMAKE_INSTALL_LIBDIR@`: works but is more complex
+  and requires correct `exec_prefix` handling.

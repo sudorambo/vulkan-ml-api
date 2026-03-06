@@ -1,269 +1,154 @@
-# Quickstart: VK_KHR_ml_primitives
+# Quickstart: Implementing the v1.0 Readiness Fixes
 
-**Branch**: `001-ml-primitives` | **Date**: 2026-03-05
+**Plan**: [plan.md](plan.md) | **Detailed fixes**: [v1.0-readiness.plan.md](v1.0-readiness.plan.md)
 
-This guide walks through building and running a minimal ML inference
-pipeline using the `VK_KHR_ml_primitives` extension.
-
----
+This guide walks through implementing the 35 fixes needed for the 1.0 release,
+organized by phase with verification steps between each phase.
 
 ## Prerequisites
 
-- Vulkan 1.3 SDK installed
-- CMake 3.20+
-- C11-capable compiler (GCC 11+, Clang 14+, or MSVC 2022+)
-- A Vulkan 1.3 driver with `VK_KHR_ml_primitives` support
-
-## Build
+- Repository cloned and on the `001-ml-primitives` branch
+- Vulkan SDK 1.3+ installed
+- CMake 3.20+, GCC 11+ or Clang 14+
 
 ```bash
-git clone <repo-url> vulkan-ml-api
-cd vulkan-ml-api
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+git checkout 001-ml-primitives
+cmake --preset default
 cmake --build build
+ctest --test-dir build --output-on-failure   # baseline: all current tests pass
 ```
 
-## Run Tests
+## Phase 1: Public API Surface (3 fixes)
+
+Start here — all other phases depend on correct header values.
+
+### Step 1: Fix sType collisions
+
+Edit `include/vulkan/vulkan_ml_primitives.h`. Change lines 73–76:
+
+```c
+VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR  = 1000559024,
+VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR       = 1000559025,
+VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR  = 1000559026,
+VK_STRUCTURE_TYPE_TENSOR_COPY_KHR             = 1000559027,
+```
+
+Then search the entire codebase for references to the old values or these
+enum names and verify the comparisons still work (they use the name, not
+the number, so they auto-update).
+
+### Step 2: Rename VK_FORMAT_R8_BOOL
+
+In `vulkan_ml_primitives.h`, rename `VK_FORMAT_R8_BOOL` to `VK_FORMAT_R8_BOOL_KHR`.
+Then update references in:
+- `src/internal.h` (`vk_ml_format_element_size` switch case)
+- `src/feature_query.c` (supported formats array)
+- Any test files that reference this format
+
+### Step 3: Move VkMLResizeModeKHR
+
+Cut the `VkMLResizeModeKHR` enum definition and paste it into the Enumerations
+section, after `VkMLTensorBindingTypeKHR`.
+
+### Verify Phase 1
 
 ```bash
-cd build
-ctest --output-on-failure
+cmake --build build 2>&1 | head -50   # must compile cleanly
+ctest --test-dir build --output-on-failure   # all tests pass
 ```
 
-## Minimal Example: Single-Layer Convolution
+## Phase 2: ICD Fixes (8 fixes)
 
-The following C program creates a tensor, builds a single-node
-convolution graph, and dispatches it. Error checking is abbreviated.
+### Key changes
 
-### Step 1: Query ML Support
+1. **ml_graph.c**: Add 4 cases to `op_desc_size_by_stype()` for concat/reshape/transpose/resize. Add deep-copy logic for reshape `pOutputDimensions` and transpose `pPermutation`. Guard scratch calculation loops with NULL checks.
 
-```c
-VkPhysicalDeviceMLFeaturesKHR mlFeatures = {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
-};
-VkPhysicalDeviceFeatures2 features2 = {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-    .pNext = &mlFeatures,
-};
-vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+2. **ml_session.c**: Add `memset(session, 0, sizeof(...))` after allocation. Add scratch size validation: `if (pCreateInfo->scratchMemorySize < g->scratchMemorySize) return VK_ERROR_UNKNOWN;`
 
-if (!mlFeatures.tensorObjects || !mlFeatures.mlPrimitives ||
-    !mlFeatures.mlGraph) {
-    /* ML not supported on this device */
-    return;
-}
-```
+3. **tensor.c**: Add sType validation. Change NULL handle `continue` to `return VK_ERROR_UNKNOWN`.
 
-### Step 2: Create an Input Tensor
+4. **tensor_view.c**: Add sType validation.
 
-```c
-const uint32_t inputDims[] = {1, 3, 224, 224};
-VkTensorDescriptionKHR inputDesc = {
-    .sType          = VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
-    .tiling         = VK_TENSOR_TILING_OPTIMAL_KHR,
-    .format         = VK_FORMAT_R16_SFLOAT,
-    .dimensionCount = 4,
-    .pDimensions    = inputDims,
-    .pStrides       = NULL,
-    .usage          = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR |
-                      VK_TENSOR_USAGE_TRANSFER_DST_BIT_KHR,
-};
+5. **tensor_copy.c**: Add `pExtents` NULL check. Replace `(int)` casts with `(uint32_t)`.
 
-VkTensorCreateInfoKHR inputCI = {
-    .sType        = VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
-    .pDescription = &inputDesc,
-    .sharingMode  = VK_SHARING_MODE_EXCLUSIVE,
-};
+6. **ml_dispatch.c**: Replace `(int)` casts with `(uint32_t)`.
 
-VkTensorKHR inputTensor;
-vkCreateTensorKHR(device, &inputCI, NULL, &inputTensor);
-```
-
-### Step 3: Query Memory and Bind
-
-```c
-VkTensorMemoryRequirementsInfoKHR memReqInfo = {
-    .sType  = VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
-    .tensor = inputTensor,
-};
-VkMemoryRequirements2 memReqs = {
-    .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-};
-vkGetTensorMemoryRequirementsKHR(device, &memReqInfo, &memReqs);
-
-/* Allocate and bind (select appropriate memory type) */
-VkDeviceMemory inputMemory;
-/* ... vkAllocateMemory with memReqs.memoryRequirements ... */
-
-VkBindTensorMemoryInfoKHR bindInfo = {
-    .sType        = VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
-    .tensor       = inputTensor,
-    .memory       = inputMemory,
-    .memoryOffset = 0,
-};
-vkBindTensorMemoryKHR(device, 1, &bindInfo);
-```
-
-### Step 4: Build an ML Graph (Single Convolution)
-
-```c
-VkMLPrimitiveDescConvolutionKHR convDesc = {
-    .sType           = VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR,
-    .inputLayout     = VK_ML_TENSOR_LAYOUT_NCHW_KHR,
-    .kernelWidth     = 3,
-    .kernelHeight    = 3,
-    .strideX         = 1,
-    .strideY         = 1,
-    .dilationX       = 1,
-    .dilationY       = 1,
-    .paddingMode     = VK_ML_PADDING_MODE_SAME_KHR,
-    .groupCount      = 1,
-    .fusedActivation = VK_ML_ACTIVATION_FUNCTION_NONE_KHR,
-};
-
-/* Define tensor bindings for the graph node */
-VkMLTensorBindingKHR nodeInputBinding = {
-    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
-    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_INPUT_KHR,
-    .tensorIndex        = 0,
-    .pTensorDescription = &inputDesc,
-};
-VkMLTensorBindingKHR nodeWeightBinding = {
-    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
-    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR,
-    .tensorIndex        = 0,
-    .pTensorDescription = &weightDesc,  /* defined similarly */
-};
-const VkMLTensorBindingKHR nodeInputs[] = {
-    nodeInputBinding, nodeWeightBinding
-};
-
-VkMLTensorBindingKHR nodeOutputBinding = {
-    .sType              = VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
-    .bindingType        = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR,
-    .tensorIndex        = 0,
-    .pTensorDescription = &outputDesc,  /* defined similarly */
-};
-
-VkMLGraphNodeCreateInfoKHR node = {
-    .sType          = VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
-    .operationType  = VK_ML_OPERATION_TYPE_CONVOLUTION_2D_KHR,
-    .pOperationDesc = &convDesc,
-    .inputCount     = 2,
-    .pInputs        = nodeInputs,
-    .outputCount    = 1,
-    .pOutputs       = &nodeOutputBinding,
-    .pNodeName      = "conv2d",
-};
-
-VkMLGraphCreateInfoKHR graphCI = {
-    .sType                       = VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
-    .nodeCount                   = 1,
-    .pNodes                      = &node,
-    .externalInputCount          = 1,
-    .pExternalInputDescriptions  = &inputDesc,
-    .externalOutputCount         = 1,
-    .pExternalOutputDescriptions = &outputDesc,
-    .constantWeightCount         = 1,
-    .pConstantWeightDescriptions = &weightDesc,
-};
-
-VkMLGraphKHR mlGraph;
-vkCreateMLGraphKHR(device, &graphCI, NULL, &mlGraph);
-```
-
-### Step 5: Create Session and Dispatch
-
-```c
-/* Query scratch memory */
-VkMemoryRequirements2 scratchReqs = {
-    .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-};
-vkGetMLGraphMemoryRequirementsKHR(device, mlGraph, &scratchReqs);
-
-/* Allocate scratch and create session */
-VkDeviceMemory scratchMemory;
-/* ... vkAllocateMemory ... */
-
-VkMLSessionCreateInfoKHR sessionCI = {
-    .sType               = VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
-    .graph               = mlGraph,
-    .scratchMemory       = scratchMemory,
-    .scratchMemoryOffset = 0,
-    .scratchMemorySize   = scratchReqs.memoryRequirements.size,
-};
-
-VkMLSessionKHR session;
-vkCreateMLSessionKHR(device, &sessionCI, NULL, &session);
-
-/* Record dispatch into a command buffer */
-VkMLGraphDispatchInfoKHR dispatchInfo = {
-    .sType             = VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR,
-    .session           = session,
-    .inputTensorCount  = 1,
-    .pInputTensors     = &inputTensor,
-    .outputTensorCount = 1,
-    .pOutputTensors    = &outputTensor,
-    .weightTensorCount = 1,
-    .pWeightTensors    = &weightTensor,
-};
-
-vkCmdDispatchMLGraphKHR(cmdBuf, &dispatchInfo);
-```
-
-### Step 6: Synchronize and Read Results
-
-```c
-/* Barrier: ML write → transfer read */
-VkTensorMemoryBarrierKHR barrier = {
-    .sType               = VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
-    .srcAccessMask       = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
-    .dstAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
-    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .tensor              = outputTensor,
-};
-VkTensorDependencyInfoKHR tensorDepInfo = {
-    .sType                    = VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR,
-    .tensorMemoryBarrierCount = 1,
-    .pTensorMemoryBarriers    = &barrier,
-};
-VkDependencyInfo depInfo = {
-    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-    .pNext = &tensorDepInfo,
-};
-vkCmdPipelineBarrier2(cmdBuf, &depInfo);
-
-/* Submit and wait, then read output tensor data */
-```
-
-### Step 7: Cleanup
-
-```c
-vkDestroyMLSessionKHR(device, session, NULL);
-vkDestroyMLGraphKHR(device, mlGraph, NULL);
-vkDestroyTensorKHR(device, outputTensor, NULL);
-vkDestroyTensorKHR(device, weightTensor, NULL);
-vkDestroyTensorKHR(device, inputTensor, NULL);
-vkFreeMemory(device, scratchMemory, NULL);
-/* ... free other memory ... */
-```
-
----
-
-## Validation
-
-Run with the validation layer enabled to catch VUID violations:
+### Verify Phase 2
 
 ```bash
-VK_INSTANCE_LAYERS=VK_LAYER_KHR_ml_validation ./your_app
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
----
+## Phase 3: Validation Layer (7 fixes)
 
-## Next Steps
+### Key changes
 
-- See `spec/VK_KHR_ml_primitives.adoc` for the full specification
-- See `specs/001-ml-primitives/data-model.md` for entity relationships
-- See `specs/001-ml-primitives/contracts/c-api.md` for the complete API surface
-- Run `/speckit.tasks` to generate the implementation task breakdown
+1. **tensor_validation.c**: Fix overflow in view range check. Add `pExtents` NULL check. Add src/dst NULL handle checks in copy validation.
+
+2. **graph_validation.c**: Add stack overflow guard. Implement `vk_ml_validate_activation_desc()`. Change unknown sType default to `return VK_FALSE`. Add cases for concat/reshape/transpose/resize.
+
+3. **vk_ml_validation.h**: Declare `vk_ml_validate_activation_desc()`.
+
+### Verify Phase 3
+
+```bash
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+## Phase 4: Infrastructure (8 fixes)
+
+1. **CMakeLists.txt**: Fix clang-tidy config, add NAMESPACE to export
+2. **cmake/vk_ml_primitives.pc.in**: Use `@CMAKE_INSTALL_FULL_LIBDIR@`
+3. **.gitignore**: Add `docs/html/` and `build-*/`
+4. **.github/workflows/ci.yml**: Dynamic codename, format check, remove CXX compiler
+5. **CONTRIBUTING.md**: Align compiler versions to GCC 11+, Clang 14+, MSVC 2022+
+
+### Verify Phase 4
+
+```bash
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+## Phase 5: Tests (6 new test functions)
+
+Add to existing test files — no new executables needed:
+
+1. `tests/unit/test_validation_coverage.c`: `test_tensor_view_uint32_overflow`, `test_tensor_copy_null_extents`, `test_tensor_copy_null_handles`
+2. `tests/unit/test_descriptor_validation.c`: activation descriptor validation tests
+3. `tests/unit/test_dag_validation.c`: `test_valid_diamond_dag`
+4. `tests/cts/test_ml_graph.c`: concat/reshape/transpose/resize graph creation tests
+
+### Verify Phase 5
+
+```bash
+cmake --build build
+ctest --test-dir build --output-on-failure   # new tests visible and passing
+```
+
+## Phase 6: Release Polish (3 items)
+
+1. Update `CHANGELOG.md`: move `[Unreleased]` to `[1.0.0]`, add v1.0 fixes
+2. Bump version: `CMakeLists.txt` `VERSION 1.0.0`, `Doxyfile` `PROJECT_NUMBER = 1.0.0`
+3. Update `README.md`: verify test counts, version references
+
+### Final Verification
+
+```bash
+cmake --build build
+ctest --test-dir build --output-on-failure
+# Static analysis (if clang-tidy/cppcheck available):
+cmake --build build --target cppcheck
+# Format check:
+find src include layers examples -name '*.c' -o -name '*.h' | xargs clang-format --dry-run --Werror
+```
+
+## Done
+
+All 35 fixes applied. Tag the release:
+
+```bash
+git tag -a v1.0.0 -m "VK_KHR_ml_primitives v1.0.0"
+```

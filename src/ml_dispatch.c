@@ -18,7 +18,7 @@ VKAPI_ATTR void VKAPI_CALL vkCmdDispatchMLGraphKHR(
 {
     if (!commandBuffer || !pDispatchInfo)
         return;
-    if ((int)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
+    if ((uint32_t)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
         return;
 
     if (pDispatchInfo->session == VK_NULL_HANDLE)

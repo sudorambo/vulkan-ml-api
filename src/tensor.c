@@ -18,6 +18,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
     (void)device;
     if (!pCreateInfo || !pCreateInfo->pDescription || !pTensor)
         return VK_ERROR_UNKNOWN;
+    if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR)
+        return VK_ERROR_UNKNOWN;
 
     const VkTensorDescriptionKHR* desc = pCreateInfo->pDescription;
     const uint32_t dimCount = desc->dimensionCount;
@@ -138,7 +140,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkBindTensorMemoryKHR(
     for (uint32_t i = 0; i < bindInfoCount; i++) {
         const VkBindTensorMemoryInfoKHR* info = &pBindInfos[i];
         if (info->tensor == VK_NULL_HANDLE)
-            continue;
+            return VK_ERROR_UNKNOWN;
 
         VkTensorKHR_T* t = (VkTensorKHR_T*)(uintptr_t)info->tensor;
         if (t->memoryBound)

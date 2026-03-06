@@ -12,7 +12,7 @@ VkBool32 vk_ml_validate_dispatch(
 {
     if (!pDispatchInfo)
         return VK_FALSE;
-    if ((int)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
+    if ((uint32_t)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_DISPATCH_SESSION */

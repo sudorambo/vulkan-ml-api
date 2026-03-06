@@ -94,8 +94,8 @@ Doxyfile                                Doxygen API docs configuration
 - **CMake** 3.20+
 - **Vulkan SDK** 1.3+ (headers and loader)
 - **C compiler** with C17 support:
-  - GCC 11+
-  - Clang 14+
+  - GCC 12+
+  - Clang 15+
   - MSVC 2022+
 
 ## Building

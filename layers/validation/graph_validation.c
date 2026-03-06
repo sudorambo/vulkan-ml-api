@@ -8,6 +8,7 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 static VkBool32 dfs_has_cycle(uint32_t node,
@@ -41,7 +42,7 @@ VkBool32 vk_ml_validate_graph_create(
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
-    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR)
+    if ((uint32_t)pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_ML_GRAPH_FEATURE */
@@ -64,15 +65,19 @@ VkBool32 vk_ml_validate_graph_create(
         return VK_FALSE;
 
     /* VUID_ML_GRAPH_DAG - cycle detection via DFS */
-    if (pCreateInfo->pNodes) {
-        uint8_t color[VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT];
-        memset(color, 0, sizeof(color));
-        for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
-            if (color[i] == 0 && dfs_has_cycle(i, pCreateInfo->pNodes,
-                                                pCreateInfo->nodeCount, color))
-                return VK_FALSE;
+    uint8_t *color = (uint8_t *)malloc(pCreateInfo->nodeCount * sizeof(uint8_t));
+    if (!color)
+        return VK_FALSE;
+    memset(color, 0, pCreateInfo->nodeCount * sizeof(uint8_t));
+    for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
+        if (color[i] == 0 && dfs_has_cycle(i, pCreateInfo->pNodes,
+                                            pCreateInfo->nodeCount, color)) {
+            free(color);
+            return VK_FALSE;
         }
     }
+    free(color);
+
     /* Per-node primitive descriptor validation */
     VkPhysicalDeviceMLFeaturesKHR feat_copy = *features;
     for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
@@ -80,7 +85,7 @@ VkBool32 vk_ml_validate_graph_create(
         if (!node->pOperationDesc)
             continue;
         const VkStructureType *pSType = (const VkStructureType *)node->pOperationDesc;
-        switch ((int)*pSType) {
+        switch ((uint32_t)*pSType) {
         case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR:
             if (!vk_ml_validate_convolution_desc(
                     (const VkMLPrimitiveDescConvolutionKHR *)node->pOperationDesc, &feat_copy))
@@ -97,6 +102,9 @@ VkBool32 vk_ml_validate_graph_create(
                 return VK_FALSE;
             break;
         case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR:
+            if (!vk_ml_validate_activation_desc(
+                    (const VkMLPrimitiveDescActivationKHR *)node->pOperationDesc))
+                return VK_FALSE;
             break;
         case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR:
             if (!vk_ml_validate_normalization_desc(
@@ -108,8 +116,28 @@ VkBool32 vk_ml_validate_graph_create(
                     (const VkMLPrimitiveDescElementwiseKHR *)node->pOperationDesc, &feat_copy))
                 return VK_FALSE;
             break;
-        default:
+        case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR:
+            if (!vk_ml_validate_concat_desc(
+                    (const VkMLPrimitiveDescConcatKHR *)node->pOperationDesc))
+                return VK_FALSE;
             break;
+        case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR:
+            if (!vk_ml_validate_reshape_desc(
+                    (const VkMLPrimitiveDescReshapeKHR *)node->pOperationDesc))
+                return VK_FALSE;
+            break;
+        case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR:
+            if (!vk_ml_validate_transpose_desc(
+                    (const VkMLPrimitiveDescTransposeKHR *)node->pOperationDesc))
+                return VK_FALSE;
+            break;
+        case VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR:
+            if (!vk_ml_validate_resize_desc(
+                    (const VkMLPrimitiveDescResizeKHR *)node->pOperationDesc))
+                return VK_FALSE;
+            break;
+        default:
+            return VK_FALSE;
         }
     }
 
@@ -122,7 +150,7 @@ VkBool32 vk_ml_validate_convolution_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
-    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR)
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR)
         return VK_FALSE;
 
     /* VUID_CONV_KERNEL */
@@ -164,7 +192,7 @@ VkBool32 vk_ml_validate_gemm_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
-    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR)
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR)
         return VK_FALSE;
 
     /* VUID_GEMM_ALPHA */
@@ -191,7 +219,7 @@ VkBool32 vk_ml_validate_pooling_desc(
 {
     if (!desc)
         return VK_FALSE;
-    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR)
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR)
         return VK_FALSE;
 
     /* VUID_POOL_TYPE */
@@ -223,7 +251,7 @@ VkBool32 vk_ml_validate_normalization_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
-    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR)
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR)
         return VK_FALSE;
 
     /* VUID_NORM_EPSILON */
@@ -253,7 +281,7 @@ VkBool32 vk_ml_validate_elementwise_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
-    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR)
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR)
         return VK_FALSE;
 
     /* VUID_ELEM_OP_TYPE */
@@ -268,6 +296,77 @@ VkBool32 vk_ml_validate_elementwise_desc(
     /* VUID_ELEM_FUSED_ACT */
     if (desc->fusedActivation != VK_ML_ACTIVATION_FUNCTION_NONE_KHR &&
         !features->fusedActivations)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_activation_desc(
+    const VkMLPrimitiveDescActivationKHR *desc)
+{
+    if (!desc)
+        return VK_FALSE;
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR)
+        return VK_FALSE;
+
+    if ((uint32_t)desc->activationType > VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR)
+        return VK_FALSE;
+
+    if (desc->activationType == VK_ML_ACTIVATION_FUNCTION_CLAMP_KHR &&
+        desc->param0 > desc->param1)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_concat_desc(
+    const VkMLPrimitiveDescConcatKHR *desc)
+{
+    if (!desc)
+        return VK_FALSE;
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_reshape_desc(
+    const VkMLPrimitiveDescReshapeKHR *desc)
+{
+    if (!desc)
+        return VK_FALSE;
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR)
+        return VK_FALSE;
+
+    if (desc->dimensionCount > 0 && !desc->pOutputDimensions)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_transpose_desc(
+    const VkMLPrimitiveDescTransposeKHR *desc)
+{
+    if (!desc)
+        return VK_FALSE;
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR)
+        return VK_FALSE;
+
+    if (desc->dimensionCount > 0 && !desc->pPermutation)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_resize_desc(
+    const VkMLPrimitiveDescResizeKHR *desc)
+{
+    if (!desc)
+        return VK_FALSE;
+    if ((uint32_t)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR)
+        return VK_FALSE;
+
+    if (desc->scaleHeight <= 0.0f || desc->scaleWidth <= 0.0f)
         return VK_FALSE;
 
     return VK_TRUE;

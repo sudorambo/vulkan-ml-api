@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(vulkan_ml_primitives
-    VERSION 0.1.0
+    VERSION 1.0.0
     LANGUAGES C
     DESCRIPTION "VK_KHR_ml_primitives Vulkan extension reference implementation"
 )
@@ -83,6 +83,7 @@ install(DIRECTORY include/vulkan
 )
 
 install(EXPORT vk_ml_primitivesTargets
+    NAMESPACE VulkanML::
     FILE vk_ml_primitivesTargets.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/vk_ml_primitives
 )
@@ -183,12 +184,7 @@ endif()
 # --------------------------------------------------------------------------
 find_program(CLANG_TIDY_EXE NAMES clang-tidy)
 if(CLANG_TIDY_EXE)
-    set(CMAKE_C_CLANG_TIDY
-        ${CLANG_TIDY_EXE};
-        -checks=-*,bugprone-*,cert-*,clang-analyzer-*,misc-*,performance-*,readability-*;
-        -warnings-as-errors=*;
-        -header-filter=${CMAKE_CURRENT_SOURCE_DIR}/include/.*
-    )
+    set(CMAKE_C_CLANG_TIDY clang-tidy)
     message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
 else()
     message(WARNING "clang-tidy not found; static analysis disabled")

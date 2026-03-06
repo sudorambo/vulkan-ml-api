@@ -68,7 +68,7 @@ static const VkFormat vk_ml_supported_tensor_formats[] = {
     (VkFormat)VK_FORMAT_R16_BFLOAT_KHR,
     (VkFormat)VK_FORMAT_R8_E4M3_KHR,
     (VkFormat)VK_FORMAT_R8_E5M2_KHR,
-    (VkFormat)VK_FORMAT_R8_BOOL,
+    (VkFormat)VK_FORMAT_R8_BOOL_KHR,
 };
 
 #define VK_ML_SUPPORTED_TENSOR_FORMAT_COUNT \
