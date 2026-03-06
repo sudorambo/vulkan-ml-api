@@ -702,6 +702,47 @@ Total: 5 tasks. 3 tests, 1 code change, 1 verification.
 
 ---
 
+## Phase 17: Review Remediation — H6 (Move Barrier Validation to Correct Directory)
+
+**Purpose**: Fix HIGH finding H6 — `vk_ml_validate_tensor_memory_barrier` and `vk_ml_validate_tensor_dependency_info` are validation functions living in `src/tensor_barrier.c` instead of `layers/validation/`. Move them to the validation layer so they compile against `vk_ml_validation.h` and signatures stay in sync.
+
+**Precondition**: Phase 16 complete. All 12 tests passing.
+
+### Sub-phase 17a: Create new barrier validation file
+
+- [X] T118 Create `layers/validation/barrier_validation.c` with the full contents of `src/tensor_barrier.c`, but replace `#include <vulkan/vulkan_ml_primitives.h>` with `#include "../validation/vk_ml_validation.h"` (which transitively includes the public header). Keep the `VALID_TENSOR_ACCESS_MASK` constant and both validation functions unchanged.
+
+### Sub-phase 17b: Update CMakeLists.txt
+
+- [X] T119 In `CMakeLists.txt`, remove `src/tensor_barrier.c` from the `IMPL_SOURCES` list.
+
+- [X] T120 In `CMakeLists.txt`, add `layers/validation/barrier_validation.c` to the `VALIDATION_SOURCES` list.
+
+### Sub-phase 17c: Delete old file
+
+- [X] T121 Delete `src/tensor_barrier.c`.
+
+### Sub-phase 17d: Build + test verification
+
+- [X] T122 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 12 tests pass (barrier VUID tests in `test_vuids.c` still link correctly from the validation library).
+
+**Checkpoint**: Barrier validation now lives in `layers/validation/` alongside all other validation code. Includes `vk_ml_validation.h` for compile-time signature checking. All tests still pass.
+
+---
+
+### Phase 17 Dependencies
+
+```text
+Sub-phase 17a (create):  T118 — create new file
+Sub-phase 17b (cmake):   T119, T120 — sequential (same file)
+Sub-phase 17c (delete):  T121 — depends on T118-T120
+Sub-phase 17d (verify):  T122 — depends on all above
+
+Total: 5 tasks. All sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

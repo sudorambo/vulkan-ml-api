@@ -26,7 +26,6 @@ set(ML_PRIMITIVES_SOURCES
     src/tensor.c
     src/tensor_view.c
     src/tensor_copy.c
-    src/tensor_barrier.c
     src/ml_primitives.c
     src/ml_graph.c
     src/ml_session.c
@@ -49,6 +48,7 @@ set(VALIDATION_SOURCES
     layers/validation/graph_validation.c
     layers/validation/session_validation.c
     layers/validation/dispatch_validation.c
+    layers/validation/barrier_validation.c
 )
 
 add_library(vk_ml_validation STATIC ${VALIDATION_SOURCES})

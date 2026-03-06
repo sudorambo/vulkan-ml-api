@@ -93,9 +93,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H6 — Barrier validation lives in wrong directory
 
-- [ ] [P] **File**: `src/tensor_barrier.c`
+- [x] **File**: `src/tensor_barrier.c` -> `layers/validation/barrier_validation.c`
 - **Description**: `vk_ml_validate_tensor_memory_barrier` and `vk_ml_validate_tensor_dependency_info` are validation functions implemented in `src/` instead of `layers/validation/`. The file doesn't include `vk_ml_validation.h`, so signatures can drift without compile-time detection.
 - **Fix**: Move the validation functions to a new `layers/validation/barrier_validation.c` (or into an existing validation file). Keep any non-validation barrier logic (if added later) in `src/tensor_barrier.c`. Update `CMakeLists.txt` to add the new file to `VALIDATION_SOURCES`. Ensure the new file includes `vk_ml_validation.h`.
+- **FIXED**: Phase 17 (T118-T122). Moved both validation functions to `layers/validation/barrier_validation.c` with `#include "../validation/vk_ml_validation.h"`. Removed `src/tensor_barrier.c` from `ML_PRIMITIVES_SOURCES`, added new file to `VALIDATION_SOURCES`. Old file deleted. All 12 tests pass.
 
 ### H7 — No README.md
 

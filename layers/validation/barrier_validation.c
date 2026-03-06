@@ -1,9 +1,9 @@
 /**
- * @file tensor_barrier.c
- * @brief VK_KHR_ml_primitives tensor memory barrier validation.
+ * @file barrier_validation.c
+ * @brief Tensor memory barrier validation for VK_KHR_ml_primitives.
  */
 
-#include <vulkan/vulkan_ml_primitives.h>
+#include "../validation/vk_ml_validation.h"
 
 /* Valid access mask bits for tensor memory barriers */
 static const VkAccessFlags2 VALID_TENSOR_ACCESS_MASK =
