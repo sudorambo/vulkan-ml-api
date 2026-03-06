@@ -103,5 +103,5 @@ jobs:
           cppcheck --enable=all --suppress=missingIncludeSystem \
             --suppress=unknownMacro --suppress=checkersReport \
             --error-exitcode=1 --inline-suppr \
-            -I include -I src \
+            -I include -I src -I layers/validation \
             src/ layers/
