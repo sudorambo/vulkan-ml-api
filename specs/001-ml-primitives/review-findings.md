@@ -163,9 +163,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M5 — `is_finite_float` fragile under `-ffast-math`
 
-- [ ] [P] **File**: `src/ml_primitives.c:12-15`
+- [x] [P] **File**: `src/ml_primitives.c:12-15`
 - **Description**: Hand-rolled `(f == f) && (f - f == 0.0f)` check relies on IEEE 754 semantics. Under `-ffast-math`, the compiler may optimize this to always return true.
 - **Fix**: Use C11 `isfinite()` from `<math.h>`. Add `-lm` to link flags if needed.
+- **FIXED**: Phase 26 (T151-T153). Replaced body with `return isfinite(f);`, added `#include <math.h>`, linked `m` on non-MSVC platforms via generator expression. All 13 tests pass.
 
 ### M6 — Inconsistent include pattern in 3 impl files
 

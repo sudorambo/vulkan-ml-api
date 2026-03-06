@@ -38,7 +38,7 @@ target_include_directories(vk_ml_primitives
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan)
+target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
 
 # --------------------------------------------------------------------------
 # Library: vk_ml_validation (validation layer)

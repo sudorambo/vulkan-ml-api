@@ -1100,6 +1100,35 @@ Total: 2 tasks. Sequential.
 
 ---
 
+## Phase 26: Review Remediation — M5 (is_finite_float Fragile Under -ffast-math)
+
+**Goal**: Replace the hand-rolled `is_finite_float` function with C11 standard `isfinite()` from `<math.h>`. The current implementation `(f == f) && (f - f == 0.0f)` relies on IEEE 754 semantics and is optimized away to `true` under `-ffast-math`. Resolves MEDIUM finding M5 from `review-findings.md`.
+
+### Sub-phase 26a: Replace function and add link dependency
+
+- [X] T151 In `src/ml_primitives.c`, add `#include <math.h>` after the existing `#include "internal.h"` (line 6). Then replace the body of `is_finite_float` (line 14: `return (f == f) && (f - f == 0.0f);`) with `return isfinite(f);`.
+
+- [X] T152 In `CMakeLists.txt`, on line 41 (`target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan)`), append `m` to the link libraries for non-MSVC platforms. Use a generator expression: `target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)`. This links libm on GCC/Clang platforms where `isfinite()` may require it, and skips it on MSVC where math functions are in the CRT.
+
+### Sub-phase 26b: Build + test verification
+
+- [X] T153 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: `is_finite_float` now uses the standards-conformant `isfinite()` macro. Immune to `-ffast-math` optimization. All 13 tests pass.
+
+---
+
+### Phase 26 Dependencies
+
+```text
+Sub-phase 26a (replace): T151, T152 — [P] (different files)
+Sub-phase 26b (verify):  T153 — depends on T151, T152
+
+Total: 3 tasks. T151 and T152 parallelizable. T153 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

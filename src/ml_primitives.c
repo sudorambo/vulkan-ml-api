@@ -4,6 +4,7 @@
  */
 
 #include "internal.h"
+#include <math.h>
 
 /* ------------------------------------------------------------------ */
 /* Primitive descriptor validation                                    */
@@ -11,7 +12,7 @@
 
 static int is_finite_float(float f)
 {
-    return (f == f) && (f - f == 0.0f);
+    return isfinite(f);
 }
 
 VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *pDesc)
