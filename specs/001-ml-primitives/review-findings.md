@@ -404,33 +404,38 @@ LOW (polish):
 
 #### M20 — Inconsistent `internal.h` include paths in validation layer files
 
-- [ ] **Files**: `layers/validation/tensor_validation.c:7`, `layers/validation/graph_validation.c:7`
+- [x] **Files**: `layers/validation/tensor_validation.c:7`, `layers/validation/graph_validation.c:7`
 - **Description**: `session_validation.c` uses the CMake-resolved `#include "internal.h"`, but `tensor_validation.c` and `graph_validation.c` still use the relative path `#include "../../src/internal.h"`. CMakeLists.txt provides `${CMAKE_CURRENT_SOURCE_DIR}/src` as a PRIVATE include directory for `vk_ml_validation`, so all three should use `#include "internal.h"`. The L10 remediation standardized `vk_ml_validation.h` includes but missed these two `internal.h` includes.
 - **Fix**: Change both files from `#include "../../src/internal.h"` to `#include "internal.h"`.
+- **FIXED**: Phase 49 (T223-T224). Changed both files to `#include "internal.h"`. All 13 tests pass.
 
 #### M21 — CTS tests use `extern` workarounds for validation functions
 
-- [ ] **Files**: `tests/cts/test_synchronization.c:15-16`, `tests/cts/test_ml_dispatch.c:7`
+- [x] **Files**: `tests/cts/test_synchronization.c:15-16`, `tests/cts/test_ml_dispatch.c:7`
 - **Description**: `test_synchronization.c` declares validation functions via raw `extern` instead of including the header. `test_ml_dispatch.c` includes `vk_ml_validation.h` via a fragile relative path `../../layers/validation/vk_ml_validation.h`. Root cause: the CTS test CMake loop only adds `src/` to the include path, not `layers/validation/`.
 - **Fix**: Add `${CMAKE_CURRENT_SOURCE_DIR}/layers/validation` to the CTS test `target_include_directories` block. Then replace `extern` declarations in `test_synchronization.c` with `#include "vk_ml_validation.h"`, and fix the relative path in `test_ml_dispatch.c`.
+- **FIXED**: Phase 49 (T225-T227). Added `layers/validation` to CTS `target_include_directories`. Replaced `extern` declarations in `test_synchronization.c` with `#include "vk_ml_validation.h"`. Changed relative path in `test_ml_dispatch.c` to `#include "vk_ml_validation.h"`. All 13 tests pass.
 
 #### M22 — Missing `VUID_SESSION_SCRATCH_OFFSET_ALIGN` string constant
 
-- [ ] **File**: `src/internal.h`
+- [x] **File**: `src/internal.h`
 - **Description**: `session_validation.c` has a `/* VUID_SESSION_SCRATCH_OFFSET_ALIGN */` comment referencing a VUID, but `internal.h` has no corresponding `#define VUID_SESSION_SCRATCH_OFFSET_ALIGN`. All other 40+ VUIDs used in the validation layer have string constants defined in `internal.h`. This was omitted during Phase 45 (L9 fix).
 - **Fix**: Add `#define VUID_SESSION_SCRATCH_OFFSET_ALIGN "VUID-VkMLSessionCreateInfoKHR-scratchMemoryOffset-00004"` to `internal.h`, following the existing naming convention.
+- **FIXED**: Phase 49 (T228). Added `#define VUID_SESSION_SCRATCH_OFFSET_ALIGN` after `VUID_SESSION_GRAPH_VALID` in `internal.h`. All 13 tests pass.
 
 #### M23 — Redundant `extern` declarations in `test_vuids.c`
 
-- [ ] [P] **File**: `tests/validation/test_vuids.c:11-12`
+- [x] [P] **File**: `tests/validation/test_vuids.c:11-12`
 - **Description**: Lines 11-12 declare `extern void vk_ml_populate_features(...)` and `extern void vk_ml_populate_properties(...)`. Both functions are already declared in `internal.h`, which is included on line 7. These `extern` lines are dead weight.
 - **Fix**: Remove lines 11-12.
+- **FIXED**: Phase 49 (T229). Removed both redundant `extern` declarations. All 13 tests pass.
 
 #### M24 — Stray `.o` files still present on disk
 
-- [ ] [P] **File**: repo root
+- [x] [P] **File**: repo root
 - **Description**: Nine `.o` files physically exist in the project root: `feature_query.o`, `ml_dispatch.o`, `ml_graph.o`, `ml_primitives.o`, `ml_session.o`, `tensor_barrier.o`, `tensor_copy.o`, `tensor.o`, `tensor_view.o`. L8 from Review 1 was marked "pre-resolved" because `.gitignore` has `*.o`, but the files were never actually deleted. Notably, `tensor_barrier.o` is an orphan from before `tensor_barrier.c` was moved to the validation layer in Phase 17. These clutter the working directory and waste disk space (~240KB total).
 - **Fix**: `rm -f *.o` from project root.
+- **FIXED**: Phase 49 (T230). Deleted all 9 stray `.o` files from project root. Confirmed no `.o` files remain.
 
 ---
 

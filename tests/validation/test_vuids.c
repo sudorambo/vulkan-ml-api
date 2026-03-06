@@ -8,9 +8,6 @@
 #include <math.h>
 #include <stdio.h>
 
-extern void vk_ml_populate_features(VkPhysicalDeviceMLFeaturesKHR *features);
-extern void vk_ml_populate_properties(VkPhysicalDeviceMLPropertiesKHR *props);
-
 static int passed;
 static int failed;
 

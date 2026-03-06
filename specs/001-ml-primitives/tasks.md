@@ -1735,6 +1735,60 @@ Total: 4 tasks.
 
 ---
 
+## Phase 49: Review Remediation — M20–M24 (Code Hygiene Batch)
+
+**Goal**: Batch remediation of 5 independent MEDIUM-severity code hygiene findings from Review 2. No behavioral changes — include path consistency, dead code removal, missing VUID define, and stray file cleanup.
+
+- [x] T223 [P] In `layers/validation/tensor_validation.c`, change `#include "../../src/internal.h"` (line 7) to `#include "internal.h"`. The CMakeLists.txt already provides `${CMAKE_CURRENT_SOURCE_DIR}/src` as a PRIVATE include directory for the `vk_ml_validation` target, so the CMake-resolved path works. This aligns with `session_validation.c` which already uses `#include "internal.h"`.
+
+- [x] T224 [P] In `layers/validation/graph_validation.c`, change `#include "../../src/internal.h"` (line 7) to `#include "internal.h"`. Same rationale as T223.
+
+- [x] T225 In `CMakeLists.txt`, in the CTS test `foreach` loop (around line 98), add `${CMAKE_CURRENT_SOURCE_DIR}/layers/validation` to the `target_include_directories` block so that CTS tests can include `vk_ml_validation.h` directly. The block should become:
+  ```
+  target_include_directories(${test_name} PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation
+  )
+  ```
+
+- [x] T226 [P] In `tests/cts/test_synchronization.c`, remove the two `extern` declarations on lines 15-16 (`extern VkBool32 vk_ml_validate_tensor_memory_barrier(...)` and `extern VkBool32 vk_ml_validate_tensor_dependency_info(...)`). Replace them with `#include "vk_ml_validation.h"` (which is now resolvable via CMake after T225).
+
+- [x] T227 [P] In `tests/cts/test_ml_dispatch.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 7) to `#include "vk_ml_validation.h"` (now resolvable via CMake after T225).
+
+- [x] T228 [P] In `src/internal.h`, add the missing `VUID_SESSION_SCRATCH_OFFSET_ALIGN` string constant define. Insert it after the `VUID_SESSION_GRAPH_VALID` define (around line 245), before `VUID_DISPATCH_CMD_STATE`:
+  ```
+  #define VUID_SESSION_SCRATCH_OFFSET_ALIGN \
+      "VUID-VkMLSessionCreateInfoKHR-scratchMemoryOffset-00004"
+  ```
+
+- [x] T229 [P] In `tests/validation/test_vuids.c`, remove the two redundant `extern` declarations on lines 11-12 (`extern void vk_ml_populate_features(...)` and `extern void vk_ml_populate_properties(...)`). Both functions are already declared in `internal.h`, which is included on line 7.
+
+- [x] T230 [P] Delete all stray `.o` files from the project root: `rm -f feature_query.o ml_dispatch.o ml_graph.o ml_primitives.o ml_session.o tensor_barrier.o tensor_copy.o tensor.o tensor_view.o`. These are untracked build artifacts (`.gitignore` has `*.o`) left from an old manual build.
+
+- [x] T231 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: All validation layer files use consistent CMake-resolved include paths. CTS tests include validation headers via CMake include dirs instead of `extern` workarounds. All VUID string constants are defined. No redundant declarations. No stray build artifacts.
+
+---
+
+### Phase 49 Dependencies
+
+```text
+T223 — standalone [P]
+T224 — standalone [P]
+T225 — standalone (CMake change, prerequisite for T226/T227)
+T226 — depends on T225 [P]
+T227 — depends on T225 [P]
+T228 — standalone [P]
+T229 — standalone [P]
+T230 — standalone [P]
+T231 — depends on T223, T224, T225, T226, T227, T228, T229
+
+Total: 9 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

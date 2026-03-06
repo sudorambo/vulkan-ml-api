@@ -12,8 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern VkBool32 vk_ml_validate_tensor_memory_barrier(const VkTensorMemoryBarrierKHR *barrier);
-extern VkBool32 vk_ml_validate_tensor_dependency_info(const VkTensorDependencyInfoKHR *depInfo);
+#include "vk_ml_validation.h"
 
 static int g_fail_count = 0;
 

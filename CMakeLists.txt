@@ -97,6 +97,7 @@ foreach(test_src ${CTS_TESTS})
     add_executable(${test_name} ${test_src})
     target_include_directories(${test_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation
     )
     target_link_libraries(${test_name} PRIVATE vk_ml_primitives vk_ml_validation)
     add_test(NAME cts_${test_name} COMMAND ${test_name})

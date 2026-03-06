@@ -243,6 +243,8 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
     "VUID-VkMLSessionCreateInfoKHR-scratchMemory-00002"
 #define VUID_SESSION_GRAPH_VALID    \
     "VUID-VkMLSessionCreateInfoKHR-graph-00003"
+#define VUID_SESSION_SCRATCH_OFFSET_ALIGN \
+    "VUID-VkMLSessionCreateInfoKHR-scratchMemoryOffset-00004"
 #define VUID_DISPATCH_CMD_STATE     \
     "VUID-vkCmdDispatchMLGraphKHR-commandBuffer-00001"
 #define VUID_DISPATCH_COMPUTE_QUEUE \
