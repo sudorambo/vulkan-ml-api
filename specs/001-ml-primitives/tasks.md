@@ -930,6 +930,58 @@ Total: 5 tasks. T128-T130 parallelizable, T131 sequential, T132 final.
 
 ---
 
+## Phase 21: Review Remediation — H10 (Remove Internal Representation Dependencies from CTS)
+
+**Goal**: Replace all internal struct casts (`VkTensorKHR_T*`, `VkTensorViewKHR_T*`, `VkMLSessionKHR_T*`) in CTS tests with public API queries. Remove `internal.h` includes from CTS files where no longer needed. Resolves HIGH finding H10 from `review-findings.md`.
+
+### Sub-phase 21a: Fix `test_tensor_lifecycle.c` (2 casts)
+
+- [X] T133 In `tests/cts/test_tensor_lifecycle.c`, replace the internal cast in `test_bind_tensor_memory` (around line 171). Currently casts to `VkTensorKHR_T*` and checks `t->memoryBound == VK_TRUE`. Replace with: after `vkBindTensorMemoryKHR` returns `VK_SUCCESS`, call `vkGetTensorMemoryRequirementsKHR` on the tensor and assert the returned `memoryRequirements.size > 0`. This proves the tensor is still valid and functional post-bind. The `VK_SUCCESS` return from bind is the observable contract for bind succeeding.
+
+- [X] T134 In `tests/cts/test_tensor_lifecycle.c`, replace the internal cast in `test_destroy_null_handle` (around line 205). Currently casts to `VkTensorKHR_T*` and checks `t->description.dimensionCount`. Replace with: call `vkGetTensorMemoryRequirementsKHR` on the live tensor and assert `memoryRequirements.size > 0`. This proves the live tensor survived the null-handle destroy intact.
+
+- [X] T135 In `tests/cts/test_tensor_lifecycle.c`, remove `#include "internal.h"` (line 10) since no internal types are used after T133-T134. The file already includes `<vulkan/vulkan_ml_primitives.h>` which provides all needed public types.
+
+### Sub-phase 21b: Fix `test_tensor_view.c` (1 cast)
+
+- [X] T136 [P] In `tests/cts/test_tensor_view.c`, replace the internal cast in `test_destroy_view_null` (around line 165). Currently casts to `VkTensorViewKHR_T*` and checks `v->format`. Replace with: call `vkGetTensorMemoryRequirementsKHR` on the parent tensor and assert `memoryRequirements.size > 0` (proves parent tensor survived). Assert `view != VK_NULL_HANDLE` (proves handle is still set). Remove `#include "../../src/internal.h"` (line 10).
+
+### Sub-phase 21c: Fix `test_tensor_copy.c` (4 casts)
+
+- [X] T137 [P] In `tests/cts/test_tensor_copy.c`, replace all 4 internal casts:
+
+  **`test_copy_basic`** (around lines 84-85): Currently casts `src` and `dst` to `VkTensorKHR_T*` and checks `description.dimensionCount == 4`. Replace with: build a `VkTensorMemoryRequirementsInfoKHR` for each tensor, call `vkGetTensorMemoryRequirementsKHR`, assert returned `size > 0` for both `src` and `dst`.
+
+  **`test_copy_null_cmd`** (around lines 151-152): Same replacement — query memory requirements for both tensors and assert `size > 0`.
+
+  Remove `#include "../../src/internal.h"` (line 10).
+
+### Sub-phase 21d: Fix `test_ml_session.c` (1 cast)
+
+- [X] T138 [P] In `tests/cts/test_ml_session.c`, replace the internal cast in `test_session_auto_alloc` (around line 192). Currently casts to `VkMLSessionKHR_T*` and checks `s->autoAllocated == VK_TRUE`. Replace with: the session was created with `scratchMemory == VK_NULL_HANDLE` and returned `VK_SUCCESS`. Assert `session != VK_NULL_HANDLE` (already done by the existing check on line 187). The auto-allocation flag is an internal implementation detail with no observable public API effect. Remove the cast entirely. Remove `#include "../../src/internal.h"` (line 7).
+
+### Sub-phase 21e: Build + test verification
+
+- [X] T139 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. Verify: `grep -r 'VkTensorKHR_T\|VkTensorViewKHR_T\|VkMLSessionKHR_T\|VkMLGraphKHR_T' tests/cts/` returns zero matches (no internal type references remain in CTS).
+
+**Checkpoint**: All CTS tests use only the public API surface. No `internal.h` includes or internal struct casts remain in `tests/cts/`. Tests are portable across any conformant ICD.
+
+---
+
+### Phase 21 Dependencies
+
+```text
+Sub-phase 21a (lifecycle): T133, T134, T135 — sequential (same file)
+Sub-phase 21b (view):      T136 — [P] (different file)
+Sub-phase 21c (copy):      T137 — [P] (different file)
+Sub-phase 21d (session):   T138 — [P] (different file)
+Sub-phase 21e (verify):    T139 — depends on T133-T138
+
+Total: 7 tasks. T136, T137, T138 parallelizable. T133-T135 sequential. T139 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

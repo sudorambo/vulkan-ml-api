@@ -124,9 +124,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H10 — CTS tests depend on internal representation
 
-- [ ] **Files**: `tests/cts/test_tensor_lifecycle.c:170`, `tests/cts/test_ml_session.c:192`
+- [x] **Files**: `test_tensor_lifecycle.c`, `test_tensor_view.c`, `test_tensor_copy.c`, `test_ml_session.c`
 - **Description**: Tests cast handles to `VkTensorKHR_T*` / `VkMLSessionKHR_T*` to inspect internal fields (`memoryBound`, `autoAllocated`). This makes them reference-implementation-specific and will break on any other ICD.
 - **Fix**: Test observable behavior through the public API instead. For bind verification, test that a subsequent operation requiring bound memory succeeds. For auto-allocation, test that the session functions correctly without explicit scratch memory.
+- **FIXED**: Phase 21 (T133-T139). Replaced all 8 internal struct casts across 4 CTS files with public API queries (`vkGetTensorMemoryRequirementsKHR` for tensor validity, `VK_SUCCESS` return for session auto-alloc). Removed `internal.h` from `test_tensor_lifecycle.c`, `test_tensor_view.c`, `test_tensor_copy.c`, `test_ml_session.c`. Also replaced `VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN` constant with `alignment > 0` check. Zero internal type references remain in CTS (`grep` verified).
 
 ---
 

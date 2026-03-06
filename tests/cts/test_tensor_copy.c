@@ -7,7 +7,6 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include "../../src/internal.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -81,11 +80,30 @@ static int test_copy_basic(void)
     VkCommandBuffer cmd = (VkCommandBuffer)(uintptr_t)0xBEEF;
     vkCmdCopyTensorKHR(cmd, &copyInfo);
 
-    VkTensorKHR_T *st = (VkTensorKHR_T *)(uintptr_t)src;
-    VkTensorKHR_T *dt = (VkTensorKHR_T *)(uintptr_t)dst;
-    if (st->description.dimensionCount != 4)
+    VkTensorMemoryRequirementsInfoKHR srcReqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = src,
+    };
+    VkMemoryRequirements2 srcMemReq = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &srcReqInfo, &srcMemReq);
+    if (srcMemReq.memoryRequirements.size == 0)
         return 1;
-    if (dt->description.dimensionCount != 4)
+
+    VkTensorMemoryRequirementsInfoKHR dstReqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = dst,
+    };
+    VkMemoryRequirements2 dstMemReq = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &dstReqInfo, &dstMemReq);
+    if (dstMemReq.memoryRequirements.size == 0)
         return 1;
 
     vkDestroyTensorKHR(VK_NULL_HANDLE, dst, NULL);
@@ -148,17 +166,37 @@ static int test_copy_null_cmd(void)
 
     vkCmdCopyTensorKHR(VK_NULL_HANDLE, &copyInfo);
 
-    VkTensorKHR_T *st = (VkTensorKHR_T *)(uintptr_t)src;
-    VkTensorKHR_T *dt = (VkTensorKHR_T *)(uintptr_t)dst;
-    if (st->description.dimensionCount != 4)
+    VkTensorMemoryRequirementsInfoKHR srcReqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = src,
+    };
+    VkMemoryRequirements2 srcMemReq = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &srcReqInfo, &srcMemReq);
+    if (srcMemReq.memoryRequirements.size == 0)
         return 1;
-    if (dt->description.dimensionCount != 4)
+
+    VkTensorMemoryRequirementsInfoKHR dstReqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = dst,
+    };
+    VkMemoryRequirements2 dstMemReq = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &dstReqInfo, &dstMemReq);
+    if (dstMemReq.memoryRequirements.size == 0)
         return 1;
 
     VkCommandBuffer cmd2 = (VkCommandBuffer)(uintptr_t)0xBEEF;
     vkCmdCopyTensorKHR(cmd2, NULL);
 
-    if (st->description.dimensionCount != 4)
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &srcReqInfo, &srcMemReq);
+    if (srcMemReq.memoryRequirements.size == 0)
         return 1;
 
     vkDestroyTensorKHR(VK_NULL_HANDLE, dst, NULL);

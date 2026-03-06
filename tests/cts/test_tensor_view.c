@@ -7,7 +7,6 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include "../../src/internal.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -162,8 +161,20 @@ static int test_destroy_view_null(void)
 
     vkDestroyTensorViewKHR(VK_NULL_HANDLE, VK_NULL_HANDLE, NULL);
 
-    VkTensorViewKHR_T *v = (VkTensorViewKHR_T *)(uintptr_t)view;
-    if (v->format != VK_FORMAT_R32_SFLOAT)
+    if (view == VK_NULL_HANDLE)
+        return 1;
+
+    VkTensorMemoryRequirementsInfoKHR reqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = tensor,
+    };
+    VkMemoryRequirements2 memReq = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &reqInfo, &memReq);
+    if (memReq.memoryRequirements.size == 0)
         return 1;
 
     vkDestroyTensorViewKHR(VK_NULL_HANDLE, view, NULL);
