@@ -177,9 +177,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M7 — No sType validation anywhere
 
-- [ ] **Files**: all create functions in `src/` and all validation functions in `layers/validation/`
+- [x] **Files**: all validation functions in `layers/validation/`
 - **Description**: Neither the ICD implementation nor the validation layer checks the `sType` field of any input structure. Wrong `sType` is a common application error and standard Vulkan validation practice.
 - **Fix**: Add `sType` checks to validation functions. For each validate function, check that the primary struct's `sType` matches the expected `VK_STRUCTURE_TYPE_*` value.
+- **FIXED**: Phase 28 (T157-T162). Added sType checks to all 14 validation functions across 5 files. Used `(int)` cast to avoid GCC `-Wenum-compare` between `VkStructureType` (core) and extension enum values. All 13 tests pass.
 
 ### M8 — No tensor handle validation in vkCreateTensorViewKHR
 

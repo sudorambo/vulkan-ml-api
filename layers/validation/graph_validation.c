@@ -41,6 +41,8 @@ VkBool32 vk_ml_validate_graph_create(
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
+    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR)
+        return VK_FALSE;
 
     /* VUID_ML_GRAPH_FEATURE */
     if (!features->mlGraph)
@@ -82,6 +84,8 @@ VkBool32 vk_ml_validate_convolution_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
+    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR)
+        return VK_FALSE;
 
     /* VUID_CONV_STRIDE */
     if (desc->strideX == 0 || desc->strideY == 0)
@@ -114,6 +118,8 @@ VkBool32 vk_ml_validate_gemm_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
+    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR)
+        return VK_FALSE;
 
     /* VUID_GEMM_ALPHA */
     if (!isfinite(desc->alpha))
@@ -138,6 +144,8 @@ VkBool32 vk_ml_validate_pooling_desc(
     const VkMLPrimitiveDescPoolingKHR *desc)
 {
     if (!desc)
+        return VK_FALSE;
+    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR)
         return VK_FALSE;
 
     /* VUID_POOL_WINDOW */
@@ -167,6 +175,8 @@ VkBool32 vk_ml_validate_normalization_desc(
 {
     if (!desc || !features)
         return VK_FALSE;
+    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR)
+        return VK_FALSE;
 
     /* VUID_NORM_EPSILON */
     if (desc->epsilon <= 0.0f || !isfinite(desc->epsilon))
@@ -194,6 +204,8 @@ VkBool32 vk_ml_validate_elementwise_desc(
     const VkPhysicalDeviceMLFeaturesKHR *features)
 {
     if (!desc || !features)
+        return VK_FALSE;
+    if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR)
         return VK_FALSE;
 
     /* VUID_ELEM_OP_TYPE */

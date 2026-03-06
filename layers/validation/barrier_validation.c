@@ -19,6 +19,8 @@ VkBool32 vk_ml_validate_tensor_memory_barrier(
 {
     if (!barrier)
         return VK_FALSE;
+    if ((int)barrier->sType != VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR)
+        return VK_FALSE;
 
     /* Tensor handle must be valid */
     if (barrier->tensor == VK_NULL_HANDLE)
@@ -43,6 +45,8 @@ VkBool32 vk_ml_validate_tensor_dependency_info(
     const VkTensorDependencyInfoKHR *depInfo)
 {
     if (!depInfo)
+        return VK_FALSE;
+    if ((int)depInfo->sType != VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR)
         return VK_FALSE;
 
     if (depInfo->tensorMemoryBarrierCount == 0)

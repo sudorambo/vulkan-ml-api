@@ -15,6 +15,8 @@ VkBool32 vk_ml_validate_tensor_create(
 {
     if (!pCreateInfo || !features || !props)
         return VK_FALSE;
+    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR)
+        return VK_FALSE;
 
     /* VUID_TENSOR_OBJECTS_FEATURE */
     if (!features->tensorObjects)
@@ -71,6 +73,8 @@ VkBool32 vk_ml_validate_tensor_view_create(
 {
     if (!pCreateInfo || !tensor)
         return VK_FALSE;
+    if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR)
+        return VK_FALSE;
 
     /* VUID_TENSOR_VIEW_FORMAT */
     uint32_t tensorElemSize = vk_ml_format_element_size(tensor->description.format);
@@ -101,6 +105,8 @@ VkBool32 vk_ml_validate_tensor_bind(
 {
     if (!pBindInfo || !tensor || !props)
         return VK_FALSE;
+    if ((int)pBindInfo->sType != VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR)
+        return VK_FALSE;
 
     /* VUID_BIND_TENSOR_ALREADY_BOUND */
     if (tensor->memoryBound)
@@ -122,6 +128,8 @@ VkBool32 vk_ml_validate_tensor_copy(
     const VkCopyTensorInfoKHR *pCopyInfo)
 {
     if (!pCopyInfo)
+        return VK_FALSE;
+    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR)
         return VK_FALSE;
 
     /* VUID_COPY_TENSOR_SAME */

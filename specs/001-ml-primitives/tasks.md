@@ -1158,6 +1158,65 @@ Total: 3 tasks. T154, T155 parallelizable. T156 final.
 
 ---
 
+## Phase 28: Review Remediation — M7 (No sType Validation Anywhere)
+
+**Goal**: Add `sType` validation as the first check (after NULL guard) in all 14 validation functions across 5 validation files. Wrong `sType` is a common application error and standard Vulkan validation practice. Resolves MEDIUM finding M7 from `review-findings.md`.
+
+### Sub-phase 28a: Tensor validation (4 functions)
+
+- [X] T157 In `layers/validation/tensor_validation.c`, add sType checks to 4 functions:
+  - `vk_ml_validate_tensor_create`: after `if (!pCreateInfo || ...) return VK_FALSE;` (line 17), add `if (pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR) return VK_FALSE;`
+  - `vk_ml_validate_tensor_view_create`: after NULL guard (line 70), add `if (pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR) return VK_FALSE;`
+  - `vk_ml_validate_tensor_bind`: after NULL guard (line 99), add `if (pBindInfo->sType != VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR) return VK_FALSE;`
+  - `vk_ml_validate_tensor_copy`: after NULL guard (line 123), add `if (pCopyInfo->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR) return VK_FALSE;`
+
+### Sub-phase 28b: Graph validation (6 functions)
+
+- [X] T158 [P] In `layers/validation/graph_validation.c`, add sType checks to 6 functions:
+  - `vk_ml_validate_graph_create`: after NULL guard, add `if (pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR) return VK_FALSE;`
+  - `vk_ml_validate_convolution_desc`: after NULL guard, add `if (desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR) return VK_FALSE;`
+  - `vk_ml_validate_gemm_desc`: after NULL guard, add `if (desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_GEMM_KHR) return VK_FALSE;`
+  - `vk_ml_validate_pooling_desc`: after NULL guard, add `if (desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_POOLING_KHR) return VK_FALSE;`
+  - `vk_ml_validate_normalization_desc`: after NULL guard, add `if (desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR) return VK_FALSE;`
+  - `vk_ml_validate_elementwise_desc`: after NULL guard, add `if (desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR) return VK_FALSE;`
+
+### Sub-phase 28c: Session validation (1 function)
+
+- [X] T159 [P] In `layers/validation/session_validation.c`, add sType check to `vk_ml_validate_session_create`: after NULL guard, add `if (pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR) return VK_FALSE;`
+
+### Sub-phase 28d: Dispatch validation (1 function)
+
+- [X] T160 [P] In `layers/validation/dispatch_validation.c`, add sType check to `vk_ml_validate_dispatch`: after NULL guard, add `if (pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR) return VK_FALSE;`
+
+### Sub-phase 28e: Barrier validation (2 functions)
+
+- [X] T161 [P] In `layers/validation/barrier_validation.c`, add sType checks to 2 functions:
+  - `vk_ml_validate_tensor_memory_barrier`: after NULL guard, add `if (barrier->sType != VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR) return VK_FALSE;`
+  - `vk_ml_validate_tensor_dependency_info`: after NULL guard, add `if (depInfo->sType != VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR) return VK_FALSE;`
+
+### Sub-phase 28f: Build + test verification
+
+- [X] T162 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. All existing tests use correct sType values and should not be affected.
+
+**Checkpoint**: All 14 validation functions now check `sType` as their first validation step (after NULL). Wrong `sType` is rejected with `VK_FALSE`. All 13 tests pass.
+
+---
+
+### Phase 28 Dependencies
+
+```text
+Sub-phase 28a (tensor):   T157 — tensor_validation.c
+Sub-phase 28b (graph):    T158 — [P] graph_validation.c
+Sub-phase 28c (session):  T159 — [P] session_validation.c
+Sub-phase 28d (dispatch): T160 — [P] dispatch_validation.c
+Sub-phase 28e (barrier):  T161 — [P] barrier_validation.c
+Sub-phase 28f (verify):   T162 — depends on T157-T161
+
+Total: 6 tasks. T157-T161 all parallelizable (different files). T162 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
