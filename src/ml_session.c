@@ -17,7 +17,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
 {
     (void)device;
     if (!pCreateInfo || !pSession)
-        return VK_ERROR_INITIALIZATION_FAILED;
+        return VK_ERROR_UNKNOWN;
 
     VkMLSessionKHR_T *session = (VkMLSessionKHR_T *)vk_ml_alloc(pAllocator,
         sizeof(VkMLSessionKHR_T));

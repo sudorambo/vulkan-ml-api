@@ -135,9 +135,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M1 — Wrong error code for NULL parameter validation
 
-- [ ] [P] **Files**: `src/tensor.c:20`, `src/tensor_view.c:20`, `src/ml_graph.c:81`, `src/ml_session.c:20`
+- [x] [P] **Files**: `src/tensor.c:20,135`, `src/tensor_view.c:20`, `src/ml_graph.c:239`, `src/ml_session.c:20`
 - **Description**: All create functions return `VK_ERROR_INITIALIZATION_FAILED` for NULL input pointers. This error code is for driver/device initialization failures. Per Vulkan convention, ICDs should not validate parameters (that's the validation layer's job), but if they do, a more appropriate code would be used.
 - **Fix**: Either remove parameter validation from ICDs (rely on validation layer) or return `VK_ERROR_UNKNOWN` / leave the behavior as implementation-defined with a comment explaining the choice.
+- **FIXED**: Phase 22 (T140-T144). Replaced all 5 occurrences of `VK_ERROR_INITIALIZATION_FAILED` with `VK_ERROR_UNKNOWN` across 4 files. NULL guards retained as defensive programming. All 13 tests pass.
 
 ### M2 — No double-bind protection in vkBindTensorMemoryKHR
 

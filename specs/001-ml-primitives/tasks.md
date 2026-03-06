@@ -982,6 +982,39 @@ Total: 7 tasks. T136, T137, T138 parallelizable. T133-T135 sequential. T139 fina
 
 ---
 
+## Phase 22: Review Remediation — M1 (Wrong Error Code for NULL Parameter Validation)
+
+**Goal**: Replace `VK_ERROR_INITIALIZATION_FAILED` with `VK_ERROR_UNKNOWN` in all ICD-level NULL parameter guards. `VK_ERROR_INITIALIZATION_FAILED` is semantically reserved for driver/device initialization failures. `VK_ERROR_UNKNOWN` (added in Vulkan 1.2) is the correct catch-all for unexpected conditions that don't match any specific error code. Resolves MEDIUM finding M1 from `review-findings.md`.
+
+### Sub-phase 22a: Fix create functions (4 files, parallelizable)
+
+- [X] T140 [P] In `src/tensor.c`, replace `VK_ERROR_INITIALIZATION_FAILED` on line 20 (the `!pCreateInfo || !pCreateInfo->pDescription || !pTensor` guard in `vkCreateTensorKHR`) with `VK_ERROR_UNKNOWN`. Also replace the same error code on line 135 (the `!pBindInfos` guard in `vkBindTensorMemoryKHR`) with `VK_ERROR_UNKNOWN`.
+
+- [X] T141 [P] In `src/tensor_view.c`, replace `VK_ERROR_INITIALIZATION_FAILED` on line 20 (the `!pCreateInfo || !pView` guard in `vkCreateTensorViewKHR`) with `VK_ERROR_UNKNOWN`.
+
+- [X] T142 [P] In `src/ml_graph.c`, replace `VK_ERROR_INITIALIZATION_FAILED` on line 239 (the `!pCreateInfo || !pGraph` guard in `vkCreateMLGraphKHR`) with `VK_ERROR_UNKNOWN`.
+
+- [X] T143 [P] In `src/ml_session.c`, replace `VK_ERROR_INITIALIZATION_FAILED` on line 20 (the `!pCreateInfo || !pSession` guard in `vkCreateMLSessionKHR`) with `VK_ERROR_UNKNOWN`.
+
+### Sub-phase 22b: Build + test verification
+
+- [X] T144 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. Verify: `grep -rn 'VK_ERROR_INITIALIZATION_FAILED' src/` returns zero matches (no misused error code remains in ICD sources).
+
+**Checkpoint**: All ICD-level NULL parameter guards return `VK_ERROR_UNKNOWN`. No test breakage (zero tests asserted on the old error code). Semantically correct per Vulkan convention.
+
+---
+
+### Phase 22 Dependencies
+
+```text
+Sub-phase 22a (create fns):  T140, T141, T142, T143 — [P] (different files)
+Sub-phase 22b (verify):      T144 — depends on T140-T143
+
+Total: 5 tasks. T140-T143 fully parallelizable. T144 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

@@ -236,7 +236,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
 {
     (void)device;
     if (!pCreateInfo || !pGraph)
-        return VK_ERROR_INITIALIZATION_FAILED;
+        return VK_ERROR_UNKNOWN;
 
     VkMLGraphKHR_T *graph = (VkMLGraphKHR_T *)vk_ml_alloc(pAllocator,
         sizeof(VkMLGraphKHR_T));
