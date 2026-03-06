@@ -1626,6 +1626,32 @@ Total: 3 tasks.
 
 ---
 
+### Phase 45: Review Remediation — L9 (Session validation doesn't check scratchMemoryOffset alignment)
+
+**Goal**: Add `scratchMemoryOffset` alignment validation and a corresponding negative test.
+
+- [X] T208 In `layers/validation/session_validation.c`, inside the `scratchMemory != VK_NULL_HANDLE` branch (after the size check), add a `VUID_SESSION_SCRATCH_OFFSET_ALIGN` check: `if (pCreateInfo->scratchMemoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0) return VK_FALSE;`. Add `#include "internal.h"` if not already present for the alignment constant.
+
+- [X] T209 [P] In `tests/validation/test_vuids.c`, add `test_session_scratch_offset_misaligned`: create a `VkMLSessionCreateInfoKHR` with `scratchMemory = (VkDeviceMemory)(uintptr_t)0x1`, `scratchMemoryOffset = 7` (misaligned), `scratchMemorySize = 1024`, valid features. Call `vk_ml_validate_session_create` and assert it returns `VK_FALSE`. Register with `RUN_TEST()` in `main()`.
+
+- [X] T210 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Misaligned scratch memory offsets are now rejected by the validation layer.
+
+---
+
+### Phase 45 Dependencies
+
+```text
+T208 — standalone (validation layer)
+T209 — parallel [P] (different file, but logically depends on T208 for the check to pass)
+T210 — depends on T208, T209
+
+Total: 3 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

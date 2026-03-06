@@ -326,13 +326,15 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L8 — Stray .o files in project root
 
-- [ ] [P] **File**: repo root
+- [x] [P] **File**: repo root
 - **Fix**: `rm -f *.o` from project root.
+- **FIXED**: No `.o` files present in repo root. `.gitignore` already contains `*.o` (line 6), preventing future tracking. No action required.
 
 ### L9 — Session validation doesn't check scratchMemoryOffset alignment
 
-- [ ] **File**: `layers/validation/session_validation.c`
+- [x] **File**: `layers/validation/session_validation.c`
 - **Fix**: Add alignment check for `scratchMemoryOffset` against device alignment requirements.
+- **FIXED**: Phase 45 (T208-T210). Added `VUID_SESSION_SCRATCH_OFFSET_ALIGN` check against `VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN` (64 bytes). Added `test_session_scratch_offset_misaligned` negative test in `test_vuids.c`. All 13 tests pass.
 
 ### L10 — Self-referencing include paths in validation files
 

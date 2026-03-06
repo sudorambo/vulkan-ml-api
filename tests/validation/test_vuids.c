@@ -42,6 +42,7 @@ static void test_tensor_bind_misaligned(void);
 static void test_tensor_bind_null_memory(void);
 static void test_barrier_null_tensor_vuid(void);
 static void test_barrier_asymmetric_qf_vuid(void);
+static void test_session_scratch_offset_misaligned(void);
 
 extern VkBool32 vk_ml_validate_tensor_memory_barrier(const VkTensorMemoryBarrierKHR *barrier);
 
@@ -231,6 +232,7 @@ int main(void)
     test_tensor_bind_null_memory();
     test_barrier_null_tensor_vuid();
     test_barrier_asymmetric_qf_vuid();
+    test_session_scratch_offset_misaligned();
 
     (void)printf("\nTotal: %d passed, %d failed\n", passed, failed);
     return failed ? 1 : 0;
@@ -706,4 +708,28 @@ static void test_tensor_bind_null_memory(void)
     };
     VkBool32 r = vk_ml_validate_tensor_bind(&bindInfo, &tensor, &props);
     expect("test_tensor_bind_null_memory", r, VK_FALSE);
+}
+
+/* ------------------------------------------------------------------ */
+/* Session scratch offset alignment                                    */
+/* ------------------------------------------------------------------ */
+
+static void test_session_scratch_offset_misaligned(void)
+{
+    VkMLSessionCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .graph = (VkMLGraphKHR)(uintptr_t)0x1,
+        .scratchMemory = (VkDeviceMemory)(uintptr_t)0x1,
+        .scratchMemoryOffset = 7,
+        .scratchMemorySize = 1024,
+    };
+    VkPhysicalDeviceMLFeaturesKHR features = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+        .pNext = NULL,
+        .mlGraphScratchAutoAllocation = VK_TRUE,
+    };
+    VkBool32 r = vk_ml_validate_session_create(&ci, 512, &features);
+    expect("test_session_scratch_offset_misaligned", r, VK_FALSE);
 }

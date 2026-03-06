@@ -4,6 +4,7 @@
  */
 
 #include "../validation/vk_ml_validation.h"
+#include "internal.h"
 
 #include <stddef.h>
 
@@ -20,6 +21,9 @@ VkBool32 vk_ml_validate_session_create(
     /* VUID_SESSION_GRAPH_VALID - graph handle must be valid (caller checks) */
 
     if (pCreateInfo->scratchMemory != VK_NULL_HANDLE) {
+        /* VUID_SESSION_SCRATCH_OFFSET_ALIGN */
+        if (pCreateInfo->scratchMemoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0)
+            return VK_FALSE;
         /* VUID_SESSION_SCRATCH_SIZE */
         if (pCreateInfo->scratchMemorySize < requiredScratchSize)
             return VK_FALSE;
