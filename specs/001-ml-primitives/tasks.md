@@ -1507,6 +1507,29 @@ Total: 5 tasks.
 
 ---
 
+### Phase 40: Review Remediation — L1 (No guard for size == 0 in vk\_ml\_alloc)
+
+**Goal**: Add a zero-size guard to `vk_ml_alloc` for portable, deterministic behavior on all platforms.
+
+- [X] T196 In `src/internal.h`, add `if (size == 0) return NULL;` as the first statement in `vk_ml_alloc`, before the `pAllocator` check.
+
+- [X] T197 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: `vk_ml_alloc(_, 0)` now returns `NULL` deterministically on all platforms.
+
+---
+
+### Phase 40 Dependencies
+
+```text
+T196 — standalone
+T197 — depends on T196
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

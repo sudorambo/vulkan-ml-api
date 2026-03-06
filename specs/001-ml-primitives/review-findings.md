@@ -87,7 +87,7 @@ Work through findings top-down by severity. Some fixes are independent and can b
   if (pCreateInfo->nodeCount > 0 && !pCreateInfo->pNodes)
       return VK_FALSE;
   ```
-  
+
 - **FIXED**: Phase 15 (T110-T112). Added `if (!pCreateInfo->pNodes) return VK_FALSE;` guard before DFS block. Added unit test with `nodeCount=1, pNodes=NULL`.
 
 ### H5 — Dispatch validation structurally incomplete
@@ -283,8 +283,9 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L1 — No guard for size == 0 in vk_ml_alloc
 
-- [ ] [P] **File**: `src/internal.h:86`
+- [x] [P] **File**: `src/internal.h:86`
 - **Fix**: Add `if (size == 0) return NULL;`
+- **FIXED**: Phase 40 (T196-T197). Added zero-size guard as first statement in `vk_ml_alloc`. All 13 tests pass.
 
 ### L2 — Missing prototypes for feature_query.c functions
 

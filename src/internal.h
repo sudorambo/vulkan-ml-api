@@ -85,6 +85,7 @@ typedef struct VkMLSessionKHR_T {
 
 static inline void *vk_ml_alloc(const VkAllocationCallbacks *pAllocator,
                                 size_t size) {
+    if (size == 0) return NULL;
     if (pAllocator && pAllocator->pfnAllocation) {
         return pAllocator->pfnAllocation(
             pAllocator->pUserData, size, _Alignof(max_align_t),
