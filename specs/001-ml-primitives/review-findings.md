@@ -165,9 +165,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M6 — Inconsistent include pattern in 3 impl files
 
-- [ ] [P] **Files**: `src/tensor_copy.c`, `src/tensor_barrier.c`, `src/ml_dispatch.c`
+- [ ] [P] **Files**: ~~`src/tensor_barrier.c`~~, `src/tensor_copy.c`, `src/ml_dispatch.c`
 - **Description**: These files include `<vulkan/vulkan_ml_primitives.h>` directly instead of `"internal.h"`, unlike the other 5 implementation files. They cannot use internal helpers, VUID constants, or struct definitions.
 - **Fix**: Change to `#include "internal.h"` for consistency. If these files genuinely don't need internal symbols, document the rationale.
+- **PARTIAL**: `src/tensor_barrier.c` was deleted during H6 fix (Phase 17). 2 of 3 original files remain (`tensor_copy.c`, `ml_dispatch.c`).
 
 ### M7 — No sType validation anywhere
 
@@ -256,20 +257,23 @@ Work through findings top-down by severity. Some fixes are independent and can b
 - [ ] [P] **File**: `src/internal.h:86`
 - **Fix**: Add `if (size == 0) return NULL;`
 
-### L2 — Missing prototypes for feature_query.c / tensor_barrier.c functions
+### L2 — Missing prototypes for feature_query.c functions
 
 - [ ] [P] **File**: `src/internal.h`
 - **Fix**: Add declarations for `vk_ml_populate_features`, `vk_ml_populate_properties`, `vk_ml_is_tensor_format_supported`, `vk_ml_populate_tensor_format_properties` to `internal.h`.
+- **PARTIAL**: The original `tensor_barrier.c` functions are now in the validation layer with proper prototypes in `vk_ml_validation.h` (H6/Phase 17). The feature_query prototypes remain missing.
 
 ### L3 — pNext shallow-copied in deep_copy_tensor_desc
 
-- [ ] **File**: `src/ml_graph.c:32`
+- [x] **File**: `src/ml_graph.c:33`
 - **Fix**: Set `dst->pNext = NULL` after the shallow copy, since the graph doesn't own the pNext chain.
+- **FIXED**: Already resolved during C1 deep-copy refactor (Phase 10). Line 33 sets `dst->pNext = NULL` immediately after the shallow copy.
 
 ### L4 — Verbose cascading cleanup in ml_graph.c
 
-- [ ] **File**: `src/ml_graph.c:119-200`
+- [x] **File**: `src/ml_graph.c`
 - **Fix**: Refactor to use a `goto cleanup` pattern to reduce ~80 lines of error handling to ~15.
+- **FIXED**: Already resolved during C1 deep-copy refactor (Phase 10). `vkCreateMLGraphKHR` now uses `goto cleanup` with `free_graph_internals` helper.
 
 ### L5 — C standard set to C11, constitution prefers C17
 
