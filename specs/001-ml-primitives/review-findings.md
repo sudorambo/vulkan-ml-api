@@ -184,15 +184,17 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M8 — No tensor handle validation in vkCreateTensorViewKHR
 
-- [ ] **File**: `src/tensor_view.c:19`
+- [x] **File**: `src/tensor_view.c:21-22`
 - **Description**: `pCreateInfo->tensor` is not checked for `VK_NULL_HANDLE`. The VUID `VUID_TENSOR_VIEW_HANDLE` is defined but not checked.
 - **Fix**: Add `if (pCreateInfo->tensor == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;`
+- **FIXED**: Phase 29 (T163). Added `if (pCreateInfo->tensor == VK_NULL_HANDLE) return VK_ERROR_UNKNOWN;` after existing NULL guard, using `VK_ERROR_UNKNOWN` per M1 precedent. All 13 tests pass.
 
 ### M9 — No graph handle validation in vkCreateMLSessionKHR
 
-- [ ] **File**: `src/ml_session.c:19`
+- [x] **File**: `src/ml_session.c:21-22`
 - **Description**: `pCreateInfo->graph` is not checked for `VK_NULL_HANDLE`. The VUID `VUID_SESSION_GRAPH_VALID` is defined but not checked.
 - **Fix**: Add null-handle check for `graph`.
+- **FIXED**: Phase 29 (T164). Added `if (pCreateInfo->graph == VK_NULL_HANDLE) return VK_ERROR_UNKNOWN;` after existing NULL guard. All 13 tests pass.
 
 ### M10 — Convolution kernelWidth/kernelHeight = 0 not rejected
 

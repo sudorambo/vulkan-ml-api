@@ -18,6 +18,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorViewKHR(
     (void)device;
     if (!pCreateInfo || !pView)
         return VK_ERROR_UNKNOWN;
+    if (pCreateInfo->tensor == VK_NULL_HANDLE)
+        return VK_ERROR_UNKNOWN;
 
     VkTensorViewKHR_T* view = (VkTensorViewKHR_T*)vk_ml_alloc(pAllocator, sizeof(VkTensorViewKHR_T));
     if (!view)

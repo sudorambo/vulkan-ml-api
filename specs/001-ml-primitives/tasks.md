@@ -1217,6 +1217,35 @@ Total: 6 tasks. T157-T161 all parallelizable (different files). T162 final.
 
 ---
 
+## Phase 29: Review Remediation — M8 + M9 (Missing Handle Validation in Create Functions)
+
+**Goal**: Add null-handle checks for `pCreateInfo->tensor` in `vkCreateTensorViewKHR` (M8) and `pCreateInfo->graph` in `vkCreateMLSessionKHR` (M9). Both are ICD-level defensive guards returning `VK_ERROR_UNKNOWN`, consistent with M1/M2/M3 precedent. Resolves MEDIUM findings M8 and M9 from `review-findings.md`.
+
+### Sub-phase 29a: Add handle guards (parallelizable)
+
+- [X] T163 [P] In `src/tensor_view.c`, after the existing NULL guard `if (!pCreateInfo || !pView) return VK_ERROR_UNKNOWN;` (line 19-20), add `if (pCreateInfo->tensor == VK_NULL_HANDLE) return VK_ERROR_UNKNOWN;` before the allocation on line 22.
+
+- [X] T164 [P] In `src/ml_session.c`, after the existing NULL guard `if (!pCreateInfo || !pSession) return VK_ERROR_UNKNOWN;` (line 19-20), add `if (pCreateInfo->graph == VK_NULL_HANDLE) return VK_ERROR_UNKNOWN;` before the allocation on line 22.
+
+### Sub-phase 29b: Build + test verification
+
+- [X] T165 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Both create functions now reject null parent handles at the ICD level. All 13 tests pass.
+
+---
+
+### Phase 29 Dependencies
+
+```text
+Sub-phase 29a (guards):  T163, T164 — [P] (different files)
+Sub-phase 29b (verify):  T165 — depends on T163, T164
+
+Total: 3 tasks. T163, T164 parallelizable. T165 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
