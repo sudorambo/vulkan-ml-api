@@ -1,0 +1,326 @@
+# Review Findings — VK_KHR_ml_primitives
+
+**Date**: 2026-03-05
+**Scope**: Full repository deep review (src, validation layer, tests, header, build, spec conformance)
+**Build status**: 12/12 tests pass, zero warnings under `-Wall -Wextra -Wpedantic -Werror`
+**Spec conformance**: 100% — all types, enums, structs, and entry points match the `.adoc` spec
+
+---
+
+## How to Use This Document
+
+Each finding has:
+
+- **ID**: Unique reference (e.g., `C1`, `H3`, `M7`)
+- **Severity**: CRITICAL > HIGH > MEDIUM > LOW
+- **Status**: `[ ]` unchecked = not started, `[x]` = fixed
+- **File(s)**: Affected source location(s)
+- **Description**: What's wrong
+- **Fix**: Recommended solution
+
+Work through findings top-down by severity. Some fixes are independent and can be parallelized (marked `[P]`).
+
+---
+
+## CRITICAL (2)
+
+### C1 — Shallow-copy dangling pointers in graph node storage
+
+- [x] **File**: `src/ml_graph.c:99-106`
+- **Description**: `vkCreateMLGraphKHR` does `memcpy` of `VkMLGraphNodeCreateInfoKHR` nodes, which contain pointers (`pOperationDesc`, `pInputs`, `pOutputs`, `pNodeName`). After the create call returns, the caller can free those pointed-to objects, leaving the graph with dangling pointers. Any subsequent traversal is use-after-free.
+- **Fix**: Deep-copy each node's `pInputs`, `pOutputs`, `pOperationDesc`, and `pNodeName` (strdup). Update `vkDestroyMLGraphKHR` to free the deep-copied data. Follow the same pattern already used for `deep_copy_tensor_desc`.
+- **FIXED**: Phase 10 (T081-T091). Added `deep_copy_op_desc`, `deep_copy_bindings`, `deep_copy_string`, `free_node_deep_data` helpers. Refactored `vkCreateMLGraphKHR` with `goto cleanup` pattern. Added 3 CTS ownership tests.
+
+### C2 — `pNext` chain clobbered in feature/property queries
+
+- [ ] **File**: `src/feature_query.c:20-21, 46, 97`
+- **Description**: `vk_ml_populate_features`, `vk_ml_populate_properties`, and `vk_ml_populate_tensor_format_properties` overwrite `sType` and set `pNext = NULL`. Vulkan convention requires the implementation to leave `sType`/`pNext` untouched — the caller sets those before querying. This breaks any pNext-chained extension structures.
+- **Fix**: Remove the lines that set `sType` and `pNext`. Only populate the data fields (feature booleans, property limits, format properties).
+
+---
+
+## HIGH (10)
+
+### H1 — Dangling description pointers in tensor
+
+- [ ] **File**: `src/tensor.c:29, 109`
+- **Description**: `tensor->description = *desc` shallow-copies the `VkTensorDescriptionKHR` including its `pDimensions` and `pStrides` pointers. The arrays are deep-copied into `tensor->dimensions`/`tensor->strides`, but `tensor->description.pDimensions` still points to the caller's (possibly freed) memory. The fallback path in `vkGetTensorMemoryRequirementsKHR` at line 109 is a latent use-after-free.
+- **Fix**: After deep-copying dimensions/strides, update the description's pointers:
+  ```c
+  tensor->description.pDimensions = tensor->dimensions;
+  tensor->description.pStrides = tensor->strides;
+  ```
+
+### H2 — Hardcoded alignment of 8 in vk_ml_alloc
+
+- [ ] [P] **File**: `src/internal.h:89`
+- **Description**: `vk_ml_alloc` passes a hardcoded alignment of `8` to the Vulkan allocation callback. This is insufficient for types requiring stricter alignment. `malloc` guarantees `_Alignof(max_align_t)`, but the callback path doesn't.
+- **Fix**: Add an `alignment` parameter to `vk_ml_alloc`, or use `_Alignof(max_align_t)` as the default. Update all callers.
+
+### H3 — Integer overflow in dimension product validation
+
+- [ ] **File**: `layers/validation/tensor_validation.c:34-44`
+- **Description**: `uint64_t product` can silently wrap when multiplying large dimensions (e.g., 4 dims of 65536 = 2^64, wraps to 0). The overflow causes `0 > maxTensorElements` to be false, so validation incorrectly passes.
+- **Fix**: Check for overflow before each multiplication:
+  ```c
+  if (desc->pDimensions[i] != 0 &&
+      product > props->maxTensorElements / desc->pDimensions[i])
+      return VK_FALSE;
+  product *= desc->pDimensions[i];
+  ```
+
+### H4 — NULL `pNodes` accepted with `nodeCount > 0`
+
+- [ ] **File**: `layers/validation/graph_validation.c:62`
+- **Description**: DFS cycle detection is guarded by `if (pCreateInfo->pNodes)`. If `pNodes == NULL` but `nodeCount > 0`, validation passes. Downstream code that dereferences `pNodes` will crash.
+- **Fix**: Add before the DFS block:
+  ```c
+  if (pCreateInfo->nodeCount > 0 && !pCreateInfo->pNodes)
+      return VK_FALSE;
+  ```
+
+### H5 — Dispatch validation structurally incomplete
+
+- [ ] **File**: `layers/validation/dispatch_validation.c`
+- **Description**: `vk_ml_validate_dispatch` only checks `session != NULL` and counts `!= 0`. It doesn't verify counts match graph expectations (no graph/session context available), doesn't check tensor array pointers are non-NULL when counts > 0, and doesn't check tensor usage flags.
+- **Fix**: (a) Add NULL-array checks for `pInputTensors`/`pOutputTensors`/`pWeightTensors` when respective counts > 0. (b) Expand the function signature to accept graph context for count matching (longer-term).
+
+### H6 — Barrier validation lives in wrong directory
+
+- [ ] [P] **File**: `src/tensor_barrier.c`
+- **Description**: `vk_ml_validate_tensor_memory_barrier` and `vk_ml_validate_tensor_dependency_info` are validation functions implemented in `src/` instead of `layers/validation/`. The file doesn't include `vk_ml_validation.h`, so signatures can drift without compile-time detection.
+- **Fix**: Move the validation functions to a new `layers/validation/barrier_validation.c` (or into an existing validation file). Keep any non-validation barrier logic (if added later) in `src/tensor_barrier.c`. Update `CMakeLists.txt` to add the new file to `VALIDATION_SOURCES`. Ensure the new file includes `vk_ml_validation.h`.
+
+### H7 — No README.md
+
+- [ ] [P] **File**: repo root
+- **Description**: The repository has no README. For a project of this scope, this is a significant gap for discoverability and onboarding.
+- **Fix**: Create `README.md` with: project description, build instructions, test instructions, directory structure guide, extension status, and link to the spec.
+
+### H8 — No OOM / allocation-failure tests
+
+- [ ] [P] **File**: all CTS tests
+- **Description**: No CTS test exercises `VK_ERROR_OUT_OF_HOST_MEMORY` return paths. The reference implementation always succeeds unless input validation fails.
+- **Fix**: Add tests using a custom `VkAllocationCallbacks` that returns NULL after N allocations. Verify create functions return `VK_ERROR_OUT_OF_HOST_MEMORY` and don't leak partially-allocated resources.
+
+### H9 — Tautological tests that can never fail
+
+- [ ] **Files**: `test_tensor_lifecycle.c:176`, `test_tensor_view.c:118`, `test_tensor_copy.c:26,89`, `test_synchronization.c:30,62,268`
+- **Description**: Several tests always pass regardless of implementation correctness:
+  - `test_destroy_null_handle` / `test_destroy_view_null` — return 0 unconditionally
+  - `test_copy_basic` / `test_copy_null_cmd` — "no crash = pass", no assertions
+  - `test_barrier_structure` / `test_dependency_info` / `test_queue_family_transfer` — verify C struct initialization reads back correctly (compiler-guaranteed)
+- **Fix**: Add meaningful assertions: verify destroy doesn't crash by checking it doesn't corrupt adjacent state, verify copy records the operation (if possible), replace struct-initialization tests with validation-layer or API-level tests.
+
+### H10 — CTS tests depend on internal representation
+
+- [ ] **Files**: `tests/cts/test_tensor_lifecycle.c:170`, `tests/cts/test_ml_session.c:192`
+- **Description**: Tests cast handles to `VkTensorKHR_T*` / `VkMLSessionKHR_T*` to inspect internal fields (`memoryBound`, `autoAllocated`). This makes them reference-implementation-specific and will break on any other ICD.
+- **Fix**: Test observable behavior through the public API instead. For bind verification, test that a subsequent operation requiring bound memory succeeds. For auto-allocation, test that the session functions correctly without explicit scratch memory.
+
+---
+
+## MEDIUM (19)
+
+### M1 — Wrong error code for NULL parameter validation
+
+- [ ] [P] **Files**: `src/tensor.c:20`, `src/tensor_view.c:20`, `src/ml_graph.c:81`, `src/ml_session.c:20`
+- **Description**: All create functions return `VK_ERROR_INITIALIZATION_FAILED` for NULL input pointers. This error code is for driver/device initialization failures. Per Vulkan convention, ICDs should not validate parameters (that's the validation layer's job), but if they do, a more appropriate code would be used.
+- **Fix**: Either remove parameter validation from ICDs (rely on validation layer) or return `VK_ERROR_UNKNOWN` / leave the behavior as implementation-defined with a comment explaining the choice.
+
+### M2 — No double-bind protection in vkBindTensorMemoryKHR
+
+- [ ] **File**: `src/tensor.c:133-142`
+- **Description**: `vkBindTensorMemoryKHR` doesn't check `tensor->memoryBound` before overwriting. A tensor can be silently re-bound, violating Vulkan semantics. The VUID is defined but not checked at the ICD level.
+- **Fix**: Add `if (t->memoryBound) return VK_ERROR_UNKNOWN;` before setting bind state, or rely on the validation layer check (already implemented in `tensor_validation.c`).
+
+### M3 — No alignment validation in vkBindTensorMemoryKHR
+
+- [ ] **File**: `src/tensor.c:140`
+- **Description**: `memoryOffset` is not checked against `VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN`. The VUID is defined but unused at the ICD level.
+- **Fix**: Add alignment check or rely on validation layer (already implemented in `tensor_validation.c`).
+
+### M4 — Magic integer literals in format element size
+
+- [ ] [P] **File**: `src/internal.h:122-125`
+- **Description**: `vk_ml_format_element_size` switch cases use raw integers (`1000559001`) instead of the enum names (`VK_FORMAT_R16_BFLOAT_KHR`).
+- **Fix**: Replace with `case (uint32_t)VK_FORMAT_R16_BFLOAT_KHR:` etc.
+
+### M5 — `is_finite_float` fragile under `-ffast-math`
+
+- [ ] [P] **File**: `src/ml_primitives.c:12-15`
+- **Description**: Hand-rolled `(f == f) && (f - f == 0.0f)` check relies on IEEE 754 semantics. Under `-ffast-math`, the compiler may optimize this to always return true.
+- **Fix**: Use C11 `isfinite()` from `<math.h>`. Add `-lm` to link flags if needed.
+
+### M6 — Inconsistent include pattern in 3 impl files
+
+- [ ] [P] **Files**: `src/tensor_copy.c`, `src/tensor_barrier.c`, `src/ml_dispatch.c`
+- **Description**: These files include `<vulkan/vulkan_ml_primitives.h>` directly instead of `"internal.h"`, unlike the other 5 implementation files. They cannot use internal helpers, VUID constants, or struct definitions.
+- **Fix**: Change to `#include "internal.h"` for consistency. If these files genuinely don't need internal symbols, document the rationale.
+
+### M7 — No sType validation anywhere
+
+- [ ] **Files**: all create functions in `src/` and all validation functions in `layers/validation/`
+- **Description**: Neither the ICD implementation nor the validation layer checks the `sType` field of any input structure. Wrong `sType` is a common application error and standard Vulkan validation practice.
+- **Fix**: Add `sType` checks to validation functions. For each validate function, check that the primary struct's `sType` matches the expected `VK_STRUCTURE_TYPE_*` value.
+
+### M8 — No tensor handle validation in vkCreateTensorViewKHR
+
+- [ ] **File**: `src/tensor_view.c:19`
+- **Description**: `pCreateInfo->tensor` is not checked for `VK_NULL_HANDLE`. The VUID `VUID_TENSOR_VIEW_HANDLE` is defined but not checked.
+- **Fix**: Add `if (pCreateInfo->tensor == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;`
+
+### M9 — No graph handle validation in vkCreateMLSessionKHR
+
+- [ ] **File**: `src/ml_session.c:19`
+- **Description**: `pCreateInfo->graph` is not checked for `VK_NULL_HANDLE`. The VUID `VUID_SESSION_GRAPH_VALID` is defined but not checked.
+- **Fix**: Add null-handle check for `graph`.
+
+### M10 — Convolution kernelWidth/kernelHeight = 0 not rejected
+
+- [ ] **File**: `layers/validation/graph_validation.c:76-106`
+- **Description**: Stride and dilation are validated as non-zero, but kernel dimensions are not. A 0x0 kernel is meaningless.
+- **Fix**: Add `if (d->kernelWidth == 0 || d->kernelHeight == 0) return VK_FALSE;`
+
+### M11 — Convolution groupCount = 0 not rejected
+
+- [ ] **File**: `layers/validation/graph_validation.c:103`
+- **Description**: `groupCount == 0` is never valid. The stub comment references shape-dependent validation, but zero can be caught unconditionally.
+- **Fix**: Add `if (d->groupCount == 0) return VK_FALSE;`
+
+### M12 — Tensor usage flags never validated
+
+- [ ] **File**: `layers/validation/tensor_validation.c:11-63`
+- **Description**: `vk_ml_validate_tensor_create` never checks `desc->usage`. Zero usage flags or invalid combinations are silently accepted.
+- **Fix**: Add `if (desc->usage == 0) return VK_FALSE;` and optionally validate that only defined bits are set.
+
+### M13 — Tensor view doesn't check tensor has memory bound
+
+- [ ] **File**: `layers/validation/tensor_validation.c:66-93`
+- **Description**: The API docs state "The source tensor must have memory bound," but `vk_ml_validate_tensor_view_create` doesn't check `tensor->memoryBound`.
+- **Fix**: Add `if (!tensor->memoryBound) return VK_FALSE;`
+
+### M14 — VUID coverage only 59%
+
+- [ ] **Files**: entire validation layer
+- **Description**: 35 of 59 defined VUIDs are fully validated. 22 are unimplemented stubs. 2 are partial. Key gaps: `VUID_BIND_TENSOR_MEM_SIZE`, `VUID_COPY_TENSOR_SRC_USAGE`, `VUID_COPY_TENSOR_DST_USAGE`, `VUID_COPY_TENSOR_MEM_BOUND`, `VUID_DISPATCH_WEIGHT_COUNT`, `VUID_DISPATCH_INPUT_USAGE`, `VUID_DISPATCH_OUTPUT_USAGE`, `VUID_DISPATCH_WEIGHT_USAGE`, and others.
+- **Fix**: Incremental — prioritize VUIDs that prevent crashes or data corruption (usage flags, memory bound checks, count matching). Some require expanded function signatures to receive the necessary context.
+
+### M15 — Naming inconsistency: sType vs struct name
+
+- [ ] [P] **File**: `include/vulkan/vulkan_ml_primitives.h:59`
+- **Description**: `VK_STRUCTURE_TYPE_TENSOR_COPY_INFO_KHR` maps to struct `VkCopyTensorInfoKHR`. Vulkan convention maps `VkFooBar` to `VK_STRUCTURE_TYPE_FOO_BAR`. Should be `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR`.
+- **Fix**: Rename to `VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR` and update all references.
+
+### M16 — PReLU test uses wrong activation type
+
+- [ ] [P] **File**: `tests/cts/test_ml_graph.c:996`
+- **Description**: `test_single_node_prelu` sets `activationType = VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR`. PReLU is semantically distinct from Leaky ReLU (per-channel learnable slopes vs fixed scalar).
+- **Fix**: Either add `VK_ML_ACTIVATION_FUNCTION_PRELU_KHR` to the enum, or document the intentional reuse with a comment explaining the mapping.
+
+### M17 — Test helper code duplication
+
+- [ ] [P] **Files**: `tests/cts/test_ml_graph.c`, `tests/cts/test_ml_session.c`, `tests/cts/test_ml_dispatch.c`
+- **Description**: `make_tensor_desc`, `make_tensor_binding_external_input/output/weight` are copy-pasted identically across 3 files.
+- **Fix**: Extract into a shared `tests/cts/test_helpers.h` and include from each file.
+
+### M18 — Missing test coverage for concurrent mode and linear tiling
+
+- [ ] [P] **Files**: CTS tests
+- **Description**: All tensors use `VK_SHARING_MODE_EXCLUSIVE` and `VK_TENSOR_TILING_OPTIMAL_KHR`. Concurrent sharing mode and linear tiling with explicit strides are never tested.
+- **Fix**: Add tests for `VK_SHARING_MODE_CONCURRENT` with valid `queueFamilyIndexCount`/`pQueueFamilyIndices`, and `VK_TENSOR_TILING_LINEAR_KHR` with explicit strides.
+
+### M19 — No NULL pointer argument tests
+
+- [ ] [P] **Files**: CTS tests
+- **Description**: No test passes `NULL` for `pCreateInfo`, `pGraph`, `pSession`, or `pTensor` to validate NULL-dereference protection.
+- **Fix**: Add negative tests that pass NULL for each output/input pointer and verify the function doesn't crash (returns error or is handled by validation layer).
+
+---
+
+## LOW (11)
+
+### L1 — No guard for size == 0 in vk_ml_alloc
+
+- [ ] [P] **File**: `src/internal.h:86`
+- **Fix**: Add `if (size == 0) return NULL;`
+
+### L2 — Missing prototypes for feature_query.c / tensor_barrier.c functions
+
+- [ ] [P] **File**: `src/internal.h`
+- **Fix**: Add declarations for `vk_ml_populate_features`, `vk_ml_populate_properties`, `vk_ml_is_tensor_format_supported`, `vk_ml_populate_tensor_format_properties` to `internal.h`.
+
+### L3 — pNext shallow-copied in deep_copy_tensor_desc
+
+- [ ] **File**: `src/ml_graph.c:32`
+- **Fix**: Set `dst->pNext = NULL` after the shallow copy, since the graph doesn't own the pNext chain.
+
+### L4 — Verbose cascading cleanup in ml_graph.c
+
+- [ ] **File**: `src/ml_graph.c:119-200`
+- **Fix**: Refactor to use a `goto cleanup` pattern to reduce ~80 lines of error handling to ~15.
+
+### L5 — C standard set to C11, constitution prefers C17
+
+- [ ] [P] **File**: `CMakeLists.txt:8`
+- **Fix**: Change `set(CMAKE_C_STANDARD 11)` to `set(CMAKE_C_STANDARD 17)`.
+
+### L6 — No install target or BUILD_TESTING guard
+
+- [ ] [P] **File**: `CMakeLists.txt`
+- **Fix**: Add `option(BUILD_TESTING "Build tests" ON)`, wrap test block in `if(BUILD_TESTING)`, add `install()` commands for library and header.
+
+### L7 — Inconsistent include paths for internal.h in tests
+
+- [ ] [P] **Files**: various test files
+- **Description**: Some use `"internal.h"` (CMake-resolved), others use `"../../src/internal.h"` (relative).
+- **Fix**: Standardize on one approach. Prefer CMake `target_include_directories` with `"internal.h"`.
+
+### L8 — Stray .o files in project root
+
+- [ ] [P] **File**: repo root
+- **Fix**: `rm -f *.o` from project root.
+
+### L9 — Session validation doesn't check scratchMemoryOffset alignment
+
+- [ ] **File**: `layers/validation/session_validation.c`
+- **Fix**: Add alignment check for `scratchMemoryOffset` against device alignment requirements.
+
+### L10 — Self-referencing include paths in validation files
+
+- [ ] [P] **Files**: `layers/validation/tensor_validation.c:6`, `layers/validation/graph_validation.c:6`
+- **Description**: `"../validation/vk_ml_validation.h"` from within `layers/validation/` is redundant.
+- **Fix**: Change to `"vk_ml_validation.h"`.
+
+### L11 — Resource leak in quickstart on partial tensor creation failure
+
+- [ ] **File**: `examples/quickstart.c:93-98`
+- **Description**: If the first tensor creates successfully but the second fails, the first is leaked due to short-circuit `||`.
+- **Fix**: Create each tensor separately with individual error checking and cleanup, or use a `goto cleanup` pattern.
+
+---
+
+## Dependency Order for Fixes
+
+```text
+CRITICAL (do first — UB in normal usage):
+  C1, C2  [independent, can parallelize]
+
+HIGH (do next — correctness & safety):
+  H1      [depends on C1 pattern]
+  H2      [independent]
+  H3, H4  [independent validation fixes]
+  H5, H6  [independent architectural fixes]
+  H7      [independent, documentation]
+  H8-H10  [independent test improvements]
+
+MEDIUM (incremental quality):
+  M1-M3   [ICD hardening, independent]
+  M4-M6   [code hygiene, independent]
+  M7-M13  [validation coverage, some depend on M14]
+  M14     [tracks overall VUID progress]
+  M15-M19 [independent fixes]
+
+LOW (polish):
+  L1-L11  [all independent]
+```

@@ -419,6 +419,67 @@ Task: "Implement barrier validation in src/tensor_barrier.c"
 
 ---
 
+## Phase 10: Review Remediation — C1 (Deep-Copy Graph Nodes)
+
+**Purpose**: Fix CRITICAL finding C1 — shallow-copy of `VkMLGraphNodeCreateInfoKHR` nodes leaves dangling pointers to caller-owned `pOperationDesc`, `pInputs`, `pOutputs`, and `pNodeName` memory after `vkCreateMLGraphKHR` returns. Refactor cleanup to use `goto cleanup` pattern (also addresses L4).
+
+**Precondition**: Phase 9 complete. All 12 tests passing.
+
+### Sub-phase 10a: Test-first — write tests that verify deep-copy ownership
+
+- [x] T081 [P] Add `test_graph_node_deep_copy` CTS test to `tests/cts/test_ml_graph.c`: create a graph using stack-local `VkMLPrimitiveDescConvolutionKHR`, `VkMLTensorBindingKHR[]`, and `const char*` node name, then overwrite/zero the stack locals after `vkCreateMLGraphKHR` returns, then call `vkGetMLGraphMemoryRequirementsKHR` and `vkDestroyMLGraphKHR` — verify no crash (proves the graph owns its own copies).
+
+- [x] T082 [P] Add `test_graph_node_null_desc_ops` CTS test to `tests/cts/test_ml_graph.c`: create a graph where nodes use descriptor-less operations (CONCAT, RESHAPE, TRANSPOSE, RESIZE) with `pOperationDesc = NULL` — verify `vkCreateMLGraphKHR` returns `VK_SUCCESS` and destroy succeeds.
+
+- [x] T083 [P] Add `test_graph_node_name_deep_copy` CTS test to `tests/cts/test_ml_graph.c`: create a graph with `pNodeName = "conv2d"` using a local `char[]` buffer, overwrite the buffer after creation, then destroy — verify no crash (proves name was deep-copied).
+
+### Sub-phase 10b: Helper functions — add deep-copy and free utilities
+
+- [x] T084 Add static helper `deep_copy_op_desc(const void *pDesc, const VkAllocationCallbacks *pAllocator)` to `src/ml_graph.c`: switch on `((const VkBaseInStructure *)pDesc)->sType` to determine descriptor struct size, allocate + memcpy. Return NULL for NULL input. Handle all 6 descriptor sType values plus unknown (return NULL, don't fail).
+
+- [x] T085 Add static helper `deep_copy_bindings(const VkMLTensorBindingKHR *pBindings, uint32_t count, const VkAllocationCallbacks *pAllocator)` to `src/ml_graph.c`: allocate `count` bindings, shallow-copy each, set `pNext = NULL`, deep-copy each `pTensorDescription` via existing `deep_copy_tensor_desc()`. On partial failure, free already-copied bindings and return NULL.
+
+- [x] T086 Add static helper `deep_copy_string(const char *str, const VkAllocationCallbacks *pAllocator)` to `src/ml_graph.c`: if `str` is NULL return NULL, else `strlen` + `vk_ml_alloc` + `memcpy` (including null terminator).
+
+- [x] T087 Add static helper `free_node_deep_data(const VkMLGraphNodeCreateInfoKHR *node, const VkAllocationCallbacks *pAllocator)` to `src/ml_graph.c`: free `pOperationDesc`, free each binding's `pTensorDescription` (dims + strides arrays then desc itself) in `pInputs` and `pOutputs` arrays, free the arrays themselves, free `pNodeName`. All frees must tolerate NULL.
+
+### Sub-phase 10c: Refactor vkCreateMLGraphKHR — goto cleanup + deep-copy nodes
+
+- [x] T088 Refactor `vkCreateMLGraphKHR` in `src/ml_graph.c` to use a `goto cleanup` pattern: introduce a `VkResult result` variable and a single `cleanup:` label that frees all partially-allocated graph data based on which fields are non-NULL. Replace the current cascading error blocks (~lines 98-201) with sequential allocation + `if (!ptr) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }`.
+
+- [x] T089 Replace the `memcpy` of nodes (current lines 98-107) with a loop that, for each node: (1) shallow-copies the `VkMLGraphNodeCreateInfoKHR` struct, (2) sets `pNext = NULL`, (3) calls `deep_copy_op_desc` for `pOperationDesc`, (4) calls `deep_copy_bindings` for `pInputs` (with `inputCount`) and `pOutputs` (with `outputCount`), (5) calls `deep_copy_string` for `pNodeName`. On any allocation failure, `goto cleanup`.
+
+### Sub-phase 10d: Update vkDestroyMLGraphKHR — free deep-copied node data
+
+- [x] T090 Update `vkDestroyMLGraphKHR` in `src/ml_graph.c` to call `free_node_deep_data(&g->nodes[i], pAllocator)` for each node before freeing the `nodes` array itself (line 236).
+
+### Sub-phase 10e: Build + test verification
+
+- [x] T091 Build with `cmake --build build` — zero warnings under `-Wall -Wextra -Wpedantic -Werror`. Run `ctest --output-on-failure` — all tests pass including the 3 new CTS tests. Run `./build/quickstart` — completes successfully.
+
+**Checkpoint**: Graph nodes are fully deep-copied. Caller-owned memory can be freed immediately after `vkCreateMLGraphKHR` without affecting the graph. All tests pass. Cleanup uses `goto` pattern, reducing error-handling code by ~60 lines.
+
+---
+
+### Phase 10 Dependencies
+
+```text
+Sub-phase 10a (tests):  T081, T082, T083 — all parallel, no dependencies
+Sub-phase 10b (helpers): T084, T085, T086, T087 — all parallel, no dependencies
+Sub-phase 10c (refactor): T088 → T089 — sequential (goto pattern first, then node deep-copy)
+Sub-phase 10d (destroy):  T090 — depends on T087 (uses free_node_deep_data)
+Sub-phase 10e (verify):   T091 — depends on all above
+
+Recommended execution order:
+  T081, T082, T083 [P] ← tests first (Constitution Principle IV)
+  T084, T085, T086, T087 [P] ← helpers next
+  T088 → T089 ← refactor create (sequential)
+  T090 ← update destroy
+  T091 ← verify
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

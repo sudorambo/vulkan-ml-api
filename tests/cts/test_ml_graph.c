@@ -9,6 +9,7 @@
 #include <vulkan/vulkan_ml_primitives.h>
 #include "internal.h"
 #include <stdio.h>
+#include <string.h>
 
 static int g_fail_count = 0;
 
@@ -1866,6 +1867,185 @@ static int test_multiple_external_io(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Deep-copy ownership tests (C1 remediation)                         */
+/* ------------------------------------------------------------------ */
+
+static int test_graph_node_deep_copy(void)
+{
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r;
+
+    {
+        uint32_t in_dims[] = {1, 64, 56, 56};
+        uint32_t out_dims[] = {1, 128, 56, 56};
+        VkTensorDescriptionKHR in_desc;
+        VkTensorDescriptionKHR out_desc;
+        make_tensor_desc(&in_desc, in_dims, 4, VK_FORMAT_R16_SFLOAT,
+                         VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+        make_tensor_desc(&out_desc, out_dims, 4, VK_FORMAT_R16_SFLOAT,
+                         VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+        VkMLPrimitiveDescConvolutionKHR conv_desc = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR,
+            .pNext = NULL,
+            .inputLayout = VK_ML_TENSOR_LAYOUT_NCHW_KHR,
+            .kernelWidth = 3, .kernelHeight = 3,
+            .strideX = 1, .strideY = 1,
+            .dilationX = 1, .dilationY = 1,
+            .paddingMode = VK_ML_PADDING_MODE_SAME_KHR,
+            .paddingTop = 0, .paddingBottom = 0,
+            .paddingLeft = 0, .paddingRight = 0,
+            .groupCount = 1,
+            .fusedActivation = VK_ML_ACTIVATION_FUNCTION_NONE_KHR,
+            .activationParam0 = 0.0f, .activationParam1 = 0.0f,
+        };
+
+        VkMLTensorBindingKHR inputs[1];
+        VkMLTensorBindingKHR outputs[1];
+        make_tensor_binding_external_input(&inputs[0], 0, &in_desc);
+        make_tensor_binding_external_output(&outputs[0], 0, &out_desc);
+
+        VkMLGraphNodeCreateInfoKHR node = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_CONVOLUTION_2D_KHR,
+            .pOperationDesc = &conv_desc,
+            .inputCount = 1, .pInputs = inputs,
+            .outputCount = 1, .pOutputs = outputs,
+            .pNodeName = "conv_test",
+        };
+
+        VkTensorDescriptionKHR ext_in[] = {in_desc};
+        VkTensorDescriptionKHR ext_out[] = {out_desc};
+
+        VkMLGraphCreateInfoKHR ci = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+            .pNext = NULL, .flags = 0,
+            .nodeCount = 1, .pNodes = &node,
+            .externalInputCount = 1, .pExternalInputDescriptions = ext_in,
+            .externalOutputCount = 1, .pExternalOutputDescriptions = ext_out,
+            .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+        };
+
+        r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+        if (r != VK_SUCCESS)
+            return 1;
+    }
+    /* All stack locals (conv_desc, bindings, dims, node) are now out of scope.
+       If the graph didn't deep-copy, these would be dangling pointers. */
+
+    VkMemoryRequirements2 mem_req = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetMLGraphMemoryRequirementsKHR(VK_NULL_HANDLE, graph, &mem_req);
+
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+static int test_graph_node_null_desc_ops(void)
+{
+    uint32_t dims[] = {1, 64, 56, 56};
+    VkTensorDescriptionKHR in_desc;
+    VkTensorDescriptionKHR out_desc;
+    make_tensor_desc(&in_desc, dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    VkMLOperationTypeKHR null_desc_ops[] = {
+        VK_ML_OPERATION_TYPE_CONCAT_KHR,
+        VK_ML_OPERATION_TYPE_RESHAPE_KHR,
+        VK_ML_OPERATION_TYPE_TRANSPOSE_KHR,
+        VK_ML_OPERATION_TYPE_RESIZE_KHR,
+    };
+
+    for (int k = 0; k < 4; k++) {
+        VkMLTensorBindingKHR input;
+        VkMLTensorBindingKHR output;
+        make_tensor_binding_external_input(&input, 0, &in_desc);
+        make_tensor_binding_external_output(&output, 0, &out_desc);
+
+        VkMLGraphNodeCreateInfoKHR node = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = null_desc_ops[k],
+            .pOperationDesc = NULL,
+            .inputCount = 1, .pInputs = &input,
+            .outputCount = 1, .pOutputs = &output,
+            .pNodeName = NULL,
+        };
+
+        VkMLGraphCreateInfoKHR ci = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+            .pNext = NULL, .flags = 0,
+            .nodeCount = 1, .pNodes = &node,
+            .externalInputCount = 1, .pExternalInputDescriptions = &in_desc,
+            .externalOutputCount = 1, .pExternalOutputDescriptions = &out_desc,
+            .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+        };
+
+        VkMLGraphKHR graph = VK_NULL_HANDLE;
+        VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+        if (r != VK_SUCCESS)
+            return 1;
+        vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    }
+    return 0;
+}
+
+static int test_graph_node_name_deep_copy(void)
+{
+    uint32_t dims[] = {1, 64, 56, 56};
+    VkTensorDescriptionKHR in_desc;
+    VkTensorDescriptionKHR out_desc;
+    make_tensor_desc(&in_desc, dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR);
+    make_tensor_desc(&out_desc, dims, 4, VK_FORMAT_R16_SFLOAT,
+                     VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR);
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    {
+        char name_buf[32];
+        memcpy(name_buf, "relu_layer_0", 13);
+
+        VkMLTensorBindingKHR input;
+        VkMLTensorBindingKHR output;
+        make_tensor_binding_external_input(&input, 0, &in_desc);
+        make_tensor_binding_external_output(&output, 0, &out_desc);
+
+        VkMLGraphNodeCreateInfoKHR node = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_RELU_KHR,
+            .pOperationDesc = NULL,
+            .inputCount = 1, .pInputs = &input,
+            .outputCount = 1, .pOutputs = &output,
+            .pNodeName = name_buf,
+        };
+
+        VkMLGraphCreateInfoKHR ci = {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+            .pNext = NULL, .flags = 0,
+            .nodeCount = 1, .pNodes = &node,
+            .externalInputCount = 1, .pExternalInputDescriptions = &in_desc,
+            .externalOutputCount = 1, .pExternalOutputDescriptions = &out_desc,
+            .constantWeightCount = 0, .pConstantWeightDescriptions = NULL,
+        };
+
+        VkResult r = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, &graph);
+        if (r != VK_SUCCESS)
+            return 1;
+
+        memset(name_buf, 0xFF, sizeof(name_buf));
+    }
+
+    vkDestroyMLGraphKHR(VK_NULL_HANDLE, graph, NULL);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -1896,6 +2076,9 @@ int main(void)
     RUN_TEST(test_scratch_memory_requirements);
     RUN_TEST(test_graph_destroy);
     RUN_TEST(test_multiple_external_io);
+    RUN_TEST(test_graph_node_deep_copy);
+    RUN_TEST(test_graph_node_null_desc_ops);
+    RUN_TEST(test_graph_node_name_deep_copy);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);
