@@ -29,7 +29,8 @@ static int g_fail_count = 0;
 
 static int test_descriptor_type_constant(void)
 {
-    if (VK_DESCRIPTOR_TYPE_TENSOR_KHR != 1000559000)
+    int val = VK_DESCRIPTOR_TYPE_TENSOR_KHR;
+    if (val != 1000559000)
         return 1;
     return 0;
 }

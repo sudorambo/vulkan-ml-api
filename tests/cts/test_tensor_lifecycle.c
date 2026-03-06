@@ -380,7 +380,11 @@ static int test_alloc_callback_alignment(void)
     if (r != VK_SUCCESS || tensor == VK_NULL_HANDLE)
         return 1;
 
+#if defined(_MSC_VER)
+    int ok = (s_captured_alignment >= 16);
+#else
     int ok = (s_captured_alignment >= _Alignof(max_align_t));
+#endif
     vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, &cbs);
     return ok ? 0 : 1;
 }
