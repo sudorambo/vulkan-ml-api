@@ -205,9 +205,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M11 — Convolution groupCount = 0 not rejected
 
-- [ ] **File**: `layers/validation/graph_validation.c:103`
+- [x] **File**: `layers/validation/graph_validation.c:114-116`
 - **Description**: `groupCount == 0` is never valid. The stub comment references shape-dependent validation, but zero can be caught unconditionally.
 - **Fix**: Add `if (d->groupCount == 0) return VK_FALSE;`
+- **FIXED**: Phase 31 (T168). Added `/* VUID_CONV_GROUP_COUNT */ if (desc->groupCount == 0) return VK_FALSE;` before the existing stub (now a TODO for future divisibility check). All 13 tests pass.
 
 ### M12 — Tensor usage flags never validated
 

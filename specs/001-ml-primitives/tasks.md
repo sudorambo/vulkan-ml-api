@@ -1269,6 +1269,29 @@ Total: 2 tasks.
 
 ---
 
+## Phase 31: Review Remediation — M11 (Convolution groupCount = 0 not rejected)
+
+**Goal**: Reject `groupCount == 0` in convolution descriptor validation. Zero is unconditionally invalid regardless of tensor shape. Validation-layer-only change. Resolves MEDIUM finding M11 from `review-findings.md`.
+
+- [X] T168 In `layers/validation/graph_validation.c`, inside `vk_ml_validate_convolution_desc`, add `/* VUID_CONV_GROUP_COUNT */ if (desc->groupCount == 0) return VK_FALSE;` immediately before the existing stub comment at line 114.
+
+- [X] T169 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Convolution validation now rejects zero groupCount. All 13 tests pass.
+
+---
+
+### Phase 31 Dependencies
+
+```text
+T168 — sequential (single file)
+T169 — depends on T168
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

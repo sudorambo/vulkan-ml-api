@@ -111,7 +111,10 @@ VkBool32 vk_ml_validate_convolution_desc(
         !features->fusedActivations)
         return VK_FALSE;
 
-    /* VUID_CONV_GROUP_COUNT - requires input channel dimension from tensor binding; stub */
+    /* VUID_CONV_GROUP_COUNT */
+    if (desc->groupCount == 0)
+        return VK_FALSE;
+    /* TODO: divisibility check requires input channel dimension from tensor binding */
 
     return VK_TRUE;
 }
