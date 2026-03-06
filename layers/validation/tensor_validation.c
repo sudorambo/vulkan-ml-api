@@ -1,0 +1,121 @@
+/**
+ * @file tensor_validation.c
+ * @brief Tensor-related validation for VK_KHR_ml_primitives.
+ */
+
+#include "../validation/vk_ml_validation.h"
+#include "../../src/internal.h"
+
+#include <stddef.h>
+
+VkBool32 vk_ml_validate_tensor_create(
+    const VkTensorCreateInfoKHR *pCreateInfo,
+    const VkPhysicalDeviceMLFeaturesKHR *features,
+    const VkPhysicalDeviceMLPropertiesKHR *props)
+{
+    if (!pCreateInfo || !features || !props)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_OBJECTS_FEATURE */
+    if (!features->tensorObjects)
+        return VK_FALSE;
+
+    const VkTensorDescriptionKHR *desc = pCreateInfo->pDescription;
+    if (!desc)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_DESC_DIM_COUNT */
+    if (desc->dimensionCount == 0 || desc->dimensionCount > props->maxTensorDimensions)
+        return VK_FALSE;
+
+    if (!desc->pDimensions)
+        return VK_FALSE;
+
+    uint64_t product = 1;
+    for (uint32_t i = 0; i < desc->dimensionCount; i++) {
+        /* VUID_TENSOR_DESC_DIM_VALUES */
+        if (desc->pDimensions[i] == 0 || desc->pDimensions[i] > props->maxTensorDimensionSize)
+            return VK_FALSE;
+        product *= desc->pDimensions[i];
+    }
+
+    /* VUID_TENSOR_DESC_DIM_PRODUCT */
+    if (product > props->maxTensorElements)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_DESC_STRIDES_OPTIMAL */
+    if (desc->tiling == VK_TENSOR_TILING_OPTIMAL_KHR && desc->pStrides != NULL)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_DESC_FORMAT */
+    uint32_t elemSize = vk_ml_format_element_size(desc->format);
+    if (elemSize == 0)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_DESC_STRIDE_ALIGN */
+    if (desc->pStrides != NULL) {
+        for (uint32_t i = 0; i < desc->dimensionCount; i++) {
+            if (desc->pStrides[i] % elemSize != 0)
+                return VK_FALSE;
+        }
+    }
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_tensor_view_create(
+    const VkTensorViewCreateInfoKHR *pCreateInfo,
+    const struct VkTensorKHR_T *tensor)
+{
+    if (!pCreateInfo || !tensor)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_VIEW_FORMAT */
+    uint32_t tensorElemSize = vk_ml_format_element_size(tensor->description.format);
+    uint32_t viewElemSize = vk_ml_format_element_size(pCreateInfo->format);
+    if (tensorElemSize == 0 || viewElemSize == 0 || tensorElemSize != viewElemSize)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_VIEW_DIM_COUNT */
+    if (pCreateInfo->dimensionCount != tensor->description.dimensionCount)
+        return VK_FALSE;
+
+    if (!tensor->dimensions || !pCreateInfo->pDimensionOffsets || !pCreateInfo->pDimensionSizes)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_VIEW_RANGE */
+    for (uint32_t i = 0; i < pCreateInfo->dimensionCount; i++) {
+        if (pCreateInfo->pDimensionOffsets[i] + pCreateInfo->pDimensionSizes[i] > tensor->dimensions[i])
+            return VK_FALSE;
+    }
+
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_tensor_bind(
+    const VkBindTensorMemoryInfoKHR *pBindInfo,
+    const VkPhysicalDeviceMLPropertiesKHR *props)
+{
+    (void)pBindInfo;
+    (void)props;
+    /* Stub: VUID_BIND_TENSOR_ALREADY_BOUND, VUID_BIND_TENSOR_ALIGNMENT, etc. */
+    return VK_TRUE;
+}
+
+VkBool32 vk_ml_validate_tensor_copy(
+    const VkCopyTensorInfoKHR *pCopyInfo)
+{
+    if (!pCopyInfo)
+        return VK_FALSE;
+
+    /* VUID_COPY_TENSOR_SAME */
+    if (pCopyInfo->srcTensor == pCopyInfo->dstTensor)
+        return VK_FALSE;
+
+    /* VUID_COPY_TENSOR_CMD_STATE / VUID_COPY_TENSOR_FORMAT etc. require more context */
+    /* regionCount > 0 (VkCopyTensorInfoKHR-regionCount-00001) */
+    if (pCopyInfo->regionCount == 0)
+        return VK_FALSE;
+
+    return VK_TRUE;
+}
