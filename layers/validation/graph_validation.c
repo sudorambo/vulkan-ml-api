@@ -8,6 +8,31 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
+
+static VkBool32 dfs_has_cycle(uint32_t node,
+                              const VkMLGraphNodeCreateInfoKHR *nodes,
+                              uint32_t nodeCount,
+                              uint8_t *color)
+{
+    color[node] = 1; /* GRAY - in progress */
+    for (uint32_t i = 0; i < nodes[node].inputCount; i++) {
+        if (!nodes[node].pInputs)
+            continue;
+        const VkMLTensorBindingKHR *binding = &nodes[node].pInputs[i];
+        if (binding->bindingType != VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR)
+            continue;
+        uint32_t pred = binding->nodeIndex;
+        if (pred >= nodeCount)
+            return VK_TRUE; /* invalid reference */
+        if (color[pred] == 1)
+            return VK_TRUE; /* back edge = cycle */
+        if (color[pred] == 0 && dfs_has_cycle(pred, nodes, nodeCount, color))
+            return VK_TRUE;
+    }
+    color[node] = 2; /* BLACK - done */
+    return VK_FALSE;
+}
 
 VkBool32 vk_ml_validate_graph_create(
     const VkMLGraphCreateInfoKHR *pCreateInfo,
@@ -33,7 +58,16 @@ VkBool32 vk_ml_validate_graph_create(
     if (pCreateInfo->externalOutputCount == 0)
         return VK_FALSE;
 
-    /* VUID_ML_GRAPH_DAG - stub: full DAG validation requires graph traversal */
+    /* VUID_ML_GRAPH_DAG - cycle detection via DFS */
+    if (pCreateInfo->pNodes) {
+        uint8_t color[VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT];
+        memset(color, 0, sizeof(color));
+        for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
+            if (color[i] == 0 && dfs_has_cycle(i, pCreateInfo->pNodes,
+                                                pCreateInfo->nodeCount, color))
+                return VK_FALSE;
+        }
+    }
     /* VUID_ML_GRAPH_EDGE_COMPAT - stub: edge compatibility requires shape analysis */
 
     return VK_TRUE;

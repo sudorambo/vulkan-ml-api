@@ -327,6 +327,98 @@ With multiple developers after US1:
 
 ---
 
+## Phase 9: Remediation (Analysis Issues C1-C4)
+
+**Purpose**: Fix 4 HIGH-severity gaps identified by `/speckit.analyze` where tasks were marked complete but underlying code is stubbed.
+
+**Prerequisites**: All previous phases complete. No mutual dependencies between C1-C4 — all can run in parallel.
+
+### C1: DAG Cycle Detection (FR-006, VUID_ML_GRAPH_DAG)
+
+**Goal**: Replace DAG validation stub with DFS-based cycle detection. Reject cyclic graphs and invalid internal tensor edge references.
+
+> **Write tests FIRST — ensure they FAIL before implementation**
+
+- [x] T064 [P] Add test_cyclic_graph (A→B→A back edge), test_self_reference (node inputs reference itself), and test_invalid_node_index (nodeIndex >= nodeCount) to tests/unit/test_dag_validation.c
+- [x] T065 [P] Add test_graph_cyclic_vuid negative test (valid graph structure but cyclic dependency → VK_FALSE) to tests/validation/test_vuids.c
+- [x] T066 Implement DFS three-color cycle detection in vk_ml_validate_graph_create (replace stub at lines 36-37) in layers/validation/graph_validation.c — use stack-allocated uint8_t color[VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT], validate all INTERNAL binding nodeIndex < nodeCount, detect back edges (GRAY→GRAY)
+
+**Checkpoint**: Cyclic graphs rejected by validation. Invalid node references detected. All existing graph tests still pass.
+
+### C2: 21 ML Operation Type Test Coverage (FR-005, SC-002)
+
+**Goal**: Add single-node graph CTS tests for the 15 untested ML operation types.
+
+- [x] T067 [P] Add test_single_node_deconvolution (DECONVOLUTION_2D_KHR with ConvolutionKHR descriptor) to tests/cts/test_ml_graph.c
+- [x] T068 [P] Add test_single_node_fully_connected (FULLY_CONNECTED_KHR with GemmKHR descriptor) to tests/cts/test_ml_graph.c
+- [x] T069 [P] Add test_single_node_average_pool (AVERAGE_POOL_2D_KHR) and test_single_node_global_avg_pool (GLOBAL_AVERAGE_POOL_KHR) with PoolingKHR descriptor to tests/cts/test_ml_graph.c
+- [x] T070 [P] Add test_single_node_sigmoid, test_single_node_tanh, test_single_node_leaky_relu, test_single_node_prelu, test_single_node_softmax (5 activation types with ActivationKHR descriptor) to tests/cts/test_ml_graph.c
+- [x] T071 [P] Add test_single_node_lrn (LRN_KHR with NormalizationKHR descriptor) to tests/cts/test_ml_graph.c
+- [x] T072 [P] Add test_single_node_elementwise_mul (ELEMENTWISE_MUL_KHR with ElementwiseKHR descriptor) to tests/cts/test_ml_graph.c
+- [x] T073 [P] Add test_single_node_concat, test_single_node_reshape, test_single_node_transpose, test_single_node_resize (4 descriptor-less operations with pOperationDesc = NULL) to tests/cts/test_ml_graph.c
+
+**Checkpoint**: All 21 ML operation types have explicit single-node graph CTS tests. All tests pass.
+
+### C3: Double-Bind Validation (Constitution V, VUID_BIND_TENSOR_ALREADY_BOUND)
+
+**Goal**: Implement tensor bind validation — reject double-bind, misaligned offset, and null memory.
+
+> **Write tests FIRST — ensure they FAIL before implementation**
+
+- [x] T074 [P] Add test_tensor_double_bind (memoryBound=VK_TRUE → VK_FALSE), test_tensor_bind_misaligned (offset=3 → VK_FALSE), test_tensor_bind_null_memory (memory=VK_NULL_HANDLE → VK_FALSE) to tests/validation/test_vuids.c
+- [x] T075 Change vk_ml_validate_tensor_bind signature to accept const struct VkTensorKHR_T *tensor parameter in layers/validation/vk_ml_validation.h
+- [x] T076 Implement vk_ml_validate_tensor_bind: check tensor->memoryBound (VUID_BIND_TENSOR_ALREADY_BOUND), pBindInfo->memoryOffset alignment against props->minTensorMemoryAlignment (VUID_BIND_TENSOR_ALIGNMENT), pBindInfo->memory != VK_NULL_HANDLE (VUID_BIND_TENSOR_MEM_TYPE) in layers/validation/tensor_validation.c
+
+**Checkpoint**: Double-bind rejected. Misaligned offsets rejected. Null memory rejected. All existing tensor tests still pass.
+
+### C4: Tensor Barrier Validation (FR-010, FR-011)
+
+**Goal**: Replace tensor_barrier.c placeholder with barrier structure validation. Validate tensor handle, access masks, and queue family indices.
+
+> **Write tests FIRST — ensure they FAIL before implementation**
+
+- [x] T077 [P] Add test_barrier_validation_valid (valid barrier → VK_TRUE), test_barrier_null_tensor (VK_NULL_HANDLE tensor → VK_FALSE), test_barrier_asymmetric_queue_family (one IGNORED, other not → VK_FALSE) to tests/cts/test_synchronization.c
+- [x] T078 [P] Add test_barrier_null_tensor_vuid and test_barrier_asymmetric_qf_vuid negative tests to tests/validation/test_vuids.c
+- [x] T079 Add vk_ml_validate_tensor_memory_barrier and vk_ml_validate_tensor_dependency_info declarations to layers/validation/vk_ml_validation.h
+- [x] T080 Implement vk_ml_validate_tensor_memory_barrier (tensor != VK_NULL_HANDLE, valid access mask bits, symmetric queue family indices) and vk_ml_validate_tensor_dependency_info (barrierCount > 0, per-barrier validation) in src/tensor_barrier.c
+
+**Checkpoint**: Valid barriers accepted. Null tensor rejected. Asymmetric queue family indices rejected. All existing synchronization tests still pass.
+
+---
+
+### Phase 9 Dependencies
+
+```text
+All C1-C4 tasks can run in parallel (different files, no mutual dependencies)
+
+C1: T064, T065 (tests) → T066 (implementation)
+C2: T067-T073 (all parallel, tests only, no impl changes)
+C3: T074 (tests) → T075 (header) → T076 (implementation)
+C4: T077, T078 (tests) → T079 (header) → T080 (implementation)
+```
+
+### Parallel Example: Phase 9
+
+```bash
+# All four issues can be addressed concurrently:
+# Developer A: C1 (DAG detection)
+Task: "DAG cycle tests in tests/unit/test_dag_validation.c"
+Task: "Implement cycle detection in layers/validation/graph_validation.c"
+
+# Developer B: C2 (21-op coverage)
+Task: "15 new single-node graph tests in tests/cts/test_ml_graph.c"
+
+# Developer C: C3 (Double-bind)
+Task: "Bind validation tests in tests/validation/test_vuids.c"
+Task: "Implement bind checks in layers/validation/tensor_validation.c"
+
+# Developer D: C4 (Barriers)
+Task: "Barrier validation tests in tests/cts/test_synchronization.c"
+Task: "Implement barrier validation in src/tensor_barrier.c"
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
@@ -335,5 +427,5 @@ With multiple developers after US1:
 - Tests MUST fail before implementing (Constitution Principle IV)
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
-- All 63 tasks reference exact file paths from plan.md
+- All tasks reference exact file paths from plan.md
 - VUID strings in validation layer MUST match spec/VK_KHR_ml_primitives.adoc exactly

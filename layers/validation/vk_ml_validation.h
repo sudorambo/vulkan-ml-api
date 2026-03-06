@@ -29,6 +29,7 @@ VkBool32 vk_ml_validate_tensor_view_create(
 
 VkBool32 vk_ml_validate_tensor_bind(
     const VkBindTensorMemoryInfoKHR *pBindInfo,
+    const struct VkTensorKHR_T *tensor,
     const VkPhysicalDeviceMLPropertiesKHR *props);
 
 VkBool32 vk_ml_validate_tensor_copy(
@@ -68,6 +69,13 @@ VkBool32 vk_ml_validate_session_create(
 /* Dispatch validation */
 VkBool32 vk_ml_validate_dispatch(
     const VkMLGraphDispatchInfoKHR *pDispatchInfo);
+
+/* Barrier validation */
+VkBool32 vk_ml_validate_tensor_memory_barrier(
+    const VkTensorMemoryBarrierKHR *barrier);
+
+VkBool32 vk_ml_validate_tensor_dependency_info(
+    const VkTensorDependencyInfoKHR *depInfo);
 
 #ifdef __cplusplus
 }

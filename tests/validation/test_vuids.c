@@ -31,11 +31,19 @@ static void expect(const char *name, VkBool32 got, VkBool32 want)
 static void test_graph_valid(void);
 static void test_graph_zero_nodes(void);
 static void test_graph_exceed_max_nodes(void);
+static void test_graph_cyclic_vuid(void);
 static void test_conv_zero_stride_vuid(void);
 static void test_gemm_inf_alpha_vuid(void);
 static void test_pool_zero_window_vuid(void);
 static void test_norm_zero_epsilon_vuid(void);
 static void test_elem_invalid_op_vuid(void);
+static void test_tensor_double_bind(void);
+static void test_tensor_bind_misaligned(void);
+static void test_tensor_bind_null_memory(void);
+static void test_barrier_null_tensor_vuid(void);
+static void test_barrier_asymmetric_qf_vuid(void);
+
+extern VkBool32 vk_ml_validate_tensor_memory_barrier(const VkTensorMemoryBarrierKHR *barrier);
 
 int main(void)
 {
@@ -212,11 +220,17 @@ int main(void)
     test_graph_valid();
     test_graph_zero_nodes();
     test_graph_exceed_max_nodes();
+    test_graph_cyclic_vuid();
     test_conv_zero_stride_vuid();
     test_gemm_inf_alpha_vuid();
     test_pool_zero_window_vuid();
     test_norm_zero_epsilon_vuid();
     test_elem_invalid_op_vuid();
+    test_tensor_double_bind();
+    test_tensor_bind_misaligned();
+    test_tensor_bind_null_memory();
+    test_barrier_null_tensor_vuid();
+    test_barrier_asymmetric_qf_vuid();
 
     (void)printf("\nTotal: %d passed, %d failed\n", passed, failed);
     return failed ? 1 : 0;
@@ -367,6 +381,119 @@ static void test_graph_exceed_max_nodes(void)
     expect("test_graph_exceed_max_nodes", r, VK_FALSE);
 }
 
+static void test_graph_cyclic_vuid(void)
+{
+    static const uint32_t dims[] = {4, 4};
+    VkTensorDescriptionKHR extInDesc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorDescriptionKHR extOutDesc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_OUTPUT_BIT_KHR,
+    };
+
+    /* Node 0 input from node 1 (INTERNAL), node 1 input from node 0 (INTERNAL) = cycle */
+    VkMLTensorBindingKHR node0_input = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+        .pNext = NULL,
+        .bindingType = VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR,
+        .nodeIndex = 1,
+        .tensorIndex = 0,
+        .pTensorDescription = &extInDesc,
+    };
+    VkMLTensorBindingKHR node0_output = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+        .pNext = NULL,
+        .bindingType = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR,
+        .nodeIndex = 0,
+        .tensorIndex = 0,
+        .pTensorDescription = &extOutDesc,
+    };
+    VkMLTensorBindingKHR node1_input = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+        .pNext = NULL,
+        .bindingType = VK_ML_TENSOR_BINDING_TYPE_INTERNAL_KHR,
+        .nodeIndex = 0,
+        .tensorIndex = 0,
+        .pTensorDescription = &extInDesc,
+    };
+    VkMLTensorBindingKHR node1_output = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR,
+        .pNext = NULL,
+        .bindingType = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR,
+        .nodeIndex = 1,
+        .tensorIndex = 0,
+        .pTensorDescription = &extOutDesc,
+    };
+
+    VkMLGraphNodeCreateInfoKHR nodes[2] = {
+        {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_RELU_KHR,
+            .pOperationDesc = NULL,
+            .inputCount = 1,
+            .pInputs = &node0_input,
+            .outputCount = 1,
+            .pOutputs = &node0_output,
+            .pNodeName = NULL,
+        },
+        {
+            .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_NODE_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .operationType = VK_ML_OPERATION_TYPE_RELU_KHR,
+            .pOperationDesc = NULL,
+            .inputCount = 1,
+            .pInputs = &node1_input,
+            .outputCount = 1,
+            .pOutputs = &node1_output,
+            .pNodeName = NULL,
+        },
+    };
+
+    VkMLGraphCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .nodeCount = 2,
+        .pNodes = nodes,
+        .externalInputCount = 1,
+        .pExternalInputDescriptions = &extInDesc,
+        .externalOutputCount = 1,
+        .pExternalOutputDescriptions = &extOutDesc,
+        .constantWeightCount = 0,
+        .pConstantWeightDescriptions = NULL,
+    };
+
+    VkPhysicalDeviceMLFeaturesKHR features = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+        .pNext = NULL,
+        .mlGraph = VK_TRUE,
+    };
+    VkPhysicalDeviceMLPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = NULL,
+        .maxMLGraphNodeCount = VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT,
+    };
+    vk_ml_populate_features(&features);
+    vk_ml_populate_properties(&props);
+    VkBool32 r = vk_ml_validate_graph_create(&createInfo, &features, &props);
+    expect("test_graph_cyclic_vuid", r, VK_FALSE);
+}
+
 static void test_conv_zero_stride_vuid(void)
 {
     VkMLPrimitiveDescConvolutionKHR conv = {
@@ -479,4 +606,104 @@ static void test_elem_invalid_op_vuid(void)
     };
     VkBool32 r = vk_ml_validate_elementwise_desc(&elem, &features);
     expect("test_elem_invalid_op_vuid", r, VK_FALSE);
+}
+
+/* ------------------------------------------------------------------ */
+/* Barrier VUID test functions                                         */
+/* ------------------------------------------------------------------ */
+
+static void test_barrier_null_tensor_vuid(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .tensor = VK_NULL_HANDLE,
+    };
+    VkBool32 r = vk_ml_validate_tensor_memory_barrier(&barrier);
+    expect("test_barrier_null_tensor_vuid", r, VK_FALSE);
+}
+
+static void test_barrier_asymmetric_qf_vuid(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = 0,
+        .tensor = (VkTensorKHR)(uintptr_t)1,
+    };
+    VkBool32 r = vk_ml_validate_tensor_memory_barrier(&barrier);
+    expect("test_barrier_asymmetric_qf_vuid", r, VK_FALSE);
+}
+
+static void test_tensor_double_bind(void)
+{
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = VK_NULL_HANDLE,
+        .memory = (VkDeviceMemory)(uintptr_t)0xDEAD,
+        .memoryOffset = 0,
+    };
+    VkTensorKHR_T tensor = { .memoryBound = VK_TRUE };
+    VkPhysicalDeviceMLPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = NULL,
+        .maxTensorDimensions = 8,
+        .maxTensorElements = 1ULL << 32,
+        .maxTensorDimensionSize = 65536,
+        .minTensorMemoryAlignment = 64,
+    };
+    VkBool32 r = vk_ml_validate_tensor_bind(&bindInfo, &tensor, &props);
+    expect("test_tensor_double_bind", r, VK_FALSE);
+}
+
+static void test_tensor_bind_misaligned(void)
+{
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = VK_NULL_HANDLE,
+        .memory = (VkDeviceMemory)(uintptr_t)0xDEAD,
+        .memoryOffset = 3,
+    };
+    VkTensorKHR_T tensor = { .memoryBound = VK_FALSE };
+    VkPhysicalDeviceMLPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = NULL,
+        .maxTensorDimensions = 8,
+        .maxTensorElements = 1ULL << 32,
+        .maxTensorDimensionSize = 65536,
+        .minTensorMemoryAlignment = 64,
+    };
+    VkBool32 r = vk_ml_validate_tensor_bind(&bindInfo, &tensor, &props);
+    expect("test_tensor_bind_misaligned", r, VK_FALSE);
+}
+
+static void test_tensor_bind_null_memory(void)
+{
+    VkBindTensorMemoryInfoKHR bindInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_BIND_TENSOR_MEMORY_INFO_KHR,
+        .pNext = NULL,
+        .tensor = VK_NULL_HANDLE,
+        .memory = VK_NULL_HANDLE,
+        .memoryOffset = 0,
+    };
+    VkTensorKHR_T tensor = { .memoryBound = VK_FALSE };
+    VkPhysicalDeviceMLPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = NULL,
+        .maxTensorDimensions = 8,
+        .maxTensorElements = 1ULL << 32,
+        .maxTensorDimensionSize = 65536,
+        .minTensorMemoryAlignment = 64,
+    };
+    VkBool32 r = vk_ml_validate_tensor_bind(&bindInfo, &tensor, &props);
+    expect("test_tensor_bind_null_memory", r, VK_FALSE);
 }

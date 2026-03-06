@@ -94,11 +94,25 @@ VkBool32 vk_ml_validate_tensor_view_create(
 
 VkBool32 vk_ml_validate_tensor_bind(
     const VkBindTensorMemoryInfoKHR *pBindInfo,
+    const struct VkTensorKHR_T *tensor,
     const VkPhysicalDeviceMLPropertiesKHR *props)
 {
-    (void)pBindInfo;
-    (void)props;
-    /* Stub: VUID_BIND_TENSOR_ALREADY_BOUND, VUID_BIND_TENSOR_ALIGNMENT, etc. */
+    if (!pBindInfo || !tensor || !props)
+        return VK_FALSE;
+
+    /* VUID_BIND_TENSOR_ALREADY_BOUND */
+    if (tensor->memoryBound)
+        return VK_FALSE;
+
+    /* VUID_BIND_TENSOR_MEM_TYPE */
+    if (pBindInfo->memory == VK_NULL_HANDLE)
+        return VK_FALSE;
+
+    /* VUID_BIND_TENSOR_ALIGNMENT */
+    if (props->minTensorMemoryAlignment > 0 &&
+        pBindInfo->memoryOffset % props->minTensorMemoryAlignment != 0)
+        return VK_FALSE;
+
     return VK_TRUE;
 }
 

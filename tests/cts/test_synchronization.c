@@ -9,8 +9,12 @@
 
 #include <vulkan/vulkan_ml_primitives.h>
 #include "internal.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+extern VkBool32 vk_ml_validate_tensor_memory_barrier(const VkTensorMemoryBarrierKHR *barrier);
+extern VkBool32 vk_ml_validate_tensor_dependency_info(const VkTensorDependencyInfoKHR *depInfo);
 
 static int g_fail_count = 0;
 
@@ -168,6 +172,97 @@ static int test_barrier_access_masks(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* test_barrier_validation_valid                                        */
+/* ------------------------------------------------------------------ */
+
+static int test_barrier_validation_valid(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .tensor = (VkTensorKHR)(uintptr_t)1,
+    };
+
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_TRUE)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* test_barrier_null_tensor_validation                                  */
+/* ------------------------------------------------------------------ */
+
+static int test_barrier_null_tensor_validation(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .tensor = VK_NULL_HANDLE,
+    };
+
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_FALSE)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* test_barrier_asymmetric_queue_family                                */
+/* ------------------------------------------------------------------ */
+
+static int test_barrier_asymmetric_queue_family(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = 0,
+        .tensor = (VkTensorKHR)(uintptr_t)1,
+    };
+
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_FALSE)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* test_dependency_info_validation                                      */
+/* ------------------------------------------------------------------ */
+
+static int test_dependency_info_validation(void)
+{
+    VkTensorMemoryBarrierKHR barrier = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .tensor = (VkTensorKHR)(uintptr_t)1,
+    };
+
+    VkTensorDependencyInfoKHR depInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR,
+        .pNext = NULL,
+        .tensorMemoryBarrierCount = 1,
+        .pTensorMemoryBarriers = &barrier,
+    };
+
+    if (vk_ml_validate_tensor_dependency_info(&depInfo) != VK_TRUE)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* test_queue_family_transfer                                           */
 /* ------------------------------------------------------------------ */
 
@@ -202,6 +297,10 @@ int main(void)
     RUN_TEST(test_barrier_with_tensor);
     RUN_TEST(test_barrier_access_masks);
     RUN_TEST(test_queue_family_transfer);
+    RUN_TEST(test_barrier_validation_valid);
+    RUN_TEST(test_barrier_null_tensor_validation);
+    RUN_TEST(test_barrier_asymmetric_queue_family);
+    RUN_TEST(test_dependency_info_validation);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);
