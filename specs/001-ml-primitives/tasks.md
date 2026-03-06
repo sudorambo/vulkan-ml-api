@@ -1391,6 +1391,29 @@ Total: 5 tasks. T175-T178 parallelizable. T179 final.
 
 ---
 
+## Phase 36: Review Remediation — M16 (PReLU test uses wrong activation type)
+
+**Goal**: Document the intentional reuse of `VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR` for the PReLU test, since no dedicated `PRELU` activation function enum exists yet. Comment-only change. Resolves MEDIUM finding M16 from `review-findings.md`.
+
+- [X] T180 In `tests/cts/test_ml_graph.c`, add a comment above the `.activationType = VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR` line (line 1000) in `test_single_node_prelu` explaining the mapping: PReLU uses the same f(x) = x > 0 ? x : alpha*x form; a dedicated `VK_ML_ACTIVATION_FUNCTION_PRELU_KHR` enum is not yet defined.
+
+- [X] T181 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: PReLU/LeakyReLU mapping documented. All 13 tests pass.
+
+---
+
+### Phase 36 Dependencies
+
+```text
+T180 — sequential (single file)
+T181 — depends on T180
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

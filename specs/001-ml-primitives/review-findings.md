@@ -245,9 +245,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M16 — PReLU test uses wrong activation type
 
-- [ ] [P] **File**: `tests/cts/test_ml_graph.c:996`
+- [x] [P] **File**: `tests/cts/test_ml_graph.c:1000`
 - **Description**: `test_single_node_prelu` sets `activationType = VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR`. PReLU is semantically distinct from Leaky ReLU (per-channel learnable slopes vs fixed scalar).
 - **Fix**: Either add `VK_ML_ACTIVATION_FUNCTION_PRELU_KHR` to the enum, or document the intentional reuse with a comment explaining the mapping.
+- **FIXED**: Phase 36 (T180). Added clarifying comment documenting the intentional reuse: PReLU uses the same `f(x)=x>0?x:a*x` form as Leaky ReLU until a dedicated enum is added. All 13 tests pass.
 
 ### M17 — Test helper code duplication
 

@@ -997,6 +997,8 @@ static int test_single_node_prelu(void)
     VkMLPrimitiveDescActivationKHR act_desc = {
         .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR,
         .pNext = NULL,
+        /* PReLU reuses LEAKY_RELU (same f(x)=x>0?x:a*x form) until a
+           dedicated VK_ML_ACTIVATION_FUNCTION_PRELU_KHR enum is added. */
         .activationType = VK_ML_ACTIVATION_FUNCTION_LEAKY_RELU_KHR,
         .param0 = 0.1f,
         .param1 = 0.0f,
