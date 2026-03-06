@@ -198,9 +198,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M10 — Convolution kernelWidth/kernelHeight = 0 not rejected
 
-- [ ] **File**: `layers/validation/graph_validation.c:76-106`
+- [x] **File**: `layers/validation/graph_validation.c:89-91`
 - **Description**: Stride and dilation are validated as non-zero, but kernel dimensions are not. A 0x0 kernel is meaningless.
 - **Fix**: Add `if (d->kernelWidth == 0 || d->kernelHeight == 0) return VK_FALSE;`
+- **FIXED**: Phase 30 (T166). Added `/* VUID_CONV_KERNEL */ if (desc->kernelWidth == 0 || desc->kernelHeight == 0) return VK_FALSE;` after sType check, before stride check. All 13 tests pass.
 
 ### M11 — Convolution groupCount = 0 not rejected
 

@@ -1246,6 +1246,29 @@ Total: 3 tasks. T163, T164 parallelizable. T165 final.
 
 ---
 
+## Phase 30: Review Remediation — M10 (Convolution kernel dimension validation)
+
+**Goal**: Reject `kernelWidth == 0` or `kernelHeight == 0` in the convolution descriptor validation. A 0x0 kernel is meaningless. Validation-layer-only change. Resolves MEDIUM finding M10 from `review-findings.md`.
+
+- [X] T166 In `layers/validation/graph_validation.c`, inside `vk_ml_validate_convolution_desc`, add a kernel-dimension check after the sType check (line 88) and before the stride check (line 90): `/* VUID_CONV_KERNEL */ if (desc->kernelWidth == 0 || desc->kernelHeight == 0) return VK_FALSE;`
+
+- [X] T167 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Convolution validation now rejects zero-dimension kernels. All 13 tests pass.
+
+---
+
+### Phase 30 Dependencies
+
+```text
+T166 — sequential (single file)
+T167 — depends on T166
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

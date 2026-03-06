@@ -87,6 +87,10 @@ VkBool32 vk_ml_validate_convolution_desc(
     if ((int)desc->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONVOLUTION_KHR)
         return VK_FALSE;
 
+    /* VUID_CONV_KERNEL */
+    if (desc->kernelWidth == 0 || desc->kernelHeight == 0)
+        return VK_FALSE;
+
     /* VUID_CONV_STRIDE */
     if (desc->strideX == 0 || desc->strideY == 0)
         return VK_FALSE;
