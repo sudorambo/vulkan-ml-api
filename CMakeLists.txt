@@ -207,6 +207,7 @@ if(CPPCHECK_EXE)
             --inline-suppr
             -I ${CMAKE_CURRENT_SOURCE_DIR}/include
             -I ${CMAKE_CURRENT_SOURCE_DIR}/src
+            -I ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/layers
         COMMENT "Running cppcheck static analysis"
