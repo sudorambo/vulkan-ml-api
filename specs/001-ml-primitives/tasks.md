@@ -480,6 +480,48 @@ Recommended execution order:
 
 ---
 
+## Phase 11: Review Remediation — C2 (pNext Chain Preservation)
+
+**Purpose**: Fix CRITICAL finding C2 — `vk_ml_populate_features`, `vk_ml_populate_properties`, and `vk_ml_populate_tensor_format_properties` overwrite caller-set `sType` and `pNext = NULL`, breaking Vulkan pNext structure chaining.
+
+**Precondition**: Phase 10 complete. All 12 tests passing.
+
+### Sub-phase 11a: Test-first — verify pNext chain is preserved after population
+
+- [X] T092 [P] Add `test_features_pnext_preserved` to `tests/cts/test_tensor_formats.c`: set `features.sType` and `features.pNext = &some_chained_struct` before calling `vk_ml_populate_features`, verify `features.pNext` is still `&some_chained_struct` and `features.sType` is unchanged after the call.
+
+- [X] T093 [P] Add `test_properties_pnext_preserved` to `tests/cts/test_tensor_formats.c`: same pattern for `vk_ml_populate_properties` — verify `pNext` and `sType` survive the call.
+
+- [X] T094 [P] Add `test_format_props_pnext_preserved` to `tests/cts/test_tensor_formats.c`: same pattern for `vk_ml_populate_tensor_format_properties` — verify `pNext` and `sType` survive the call.
+
+### Sub-phase 11b: Fix — remove sType/pNext overwrites
+
+- [X] T095 Remove `features->sType = ...` and `features->pNext = NULL` (lines 20-21) from `vk_ml_populate_features` in `src/feature_query.c`.
+
+- [X] T096 Remove `props->sType = ...` and `props->pNext = NULL` (lines 45-46) from `vk_ml_populate_properties` in `src/feature_query.c`.
+
+- [X] T097 Remove `props->sType = ...` and `props->pNext = NULL` (lines 96-97) from `vk_ml_populate_tensor_format_properties` in `src/feature_query.c`.
+
+### Sub-phase 11c: Build + test verification
+
+- [X] T098 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the 3 new pNext preservation tests.
+
+**Checkpoint**: Feature/property queries no longer clobber caller-set `sType`/`pNext`. All pNext chain tests pass. All existing tests still pass.
+
+---
+
+### Phase 11 Dependencies
+
+```text
+Sub-phase 11a (tests):  T092, T093, T094 — all parallel
+Sub-phase 11b (fix):    T095, T096, T097 — all parallel (same file, different functions)
+Sub-phase 11c (verify): T098 — depends on all above
+
+Total: 7 tasks. All test tasks parallel. All fix tasks parallel.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

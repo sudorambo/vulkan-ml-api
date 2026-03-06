@@ -33,9 +33,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### C2 — `pNext` chain clobbered in feature/property queries
 
-- [ ] **File**: `src/feature_query.c:20-21, 46, 97`
+- [x] **File**: `src/feature_query.c:20-21, 46, 97`
 - **Description**: `vk_ml_populate_features`, `vk_ml_populate_properties`, and `vk_ml_populate_tensor_format_properties` overwrite `sType` and set `pNext = NULL`. Vulkan convention requires the implementation to leave `sType`/`pNext` untouched — the caller sets those before querying. This breaks any pNext-chained extension structures.
 - **Fix**: Remove the lines that set `sType` and `pNext`. Only populate the data fields (feature booleans, property limits, format properties).
+- **FIXED**: Phase 11 (T092-T098). Removed `sType`/`pNext` overwrites from all 3 populate functions. Added 3 CTS tests verifying pNext chain preservation.
 
 ---
 

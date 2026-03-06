@@ -17,8 +17,6 @@ void vk_ml_populate_features(VkPhysicalDeviceMLFeaturesKHR *features)
     if (!features)
         return;
 
-    features->sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR;
-    features->pNext = NULL;
     features->mlPrimitives = VK_TRUE;
     features->mlGraph = VK_TRUE;
     features->tensorObjects = VK_TRUE;
@@ -42,8 +40,6 @@ void vk_ml_populate_properties(VkPhysicalDeviceMLPropertiesKHR *props)
     if (!props)
         return;
 
-    props->sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR;
-    props->pNext = NULL;
     props->maxTensorDimensions = VK_ML_REF_MAX_TENSOR_DIMENSIONS;
     props->maxTensorElements = VK_ML_REF_MAX_TENSOR_ELEMENTS;
     props->maxTensorDimensionSize = VK_ML_REF_MAX_TENSOR_DIMENSION_SIZE;
@@ -92,9 +88,6 @@ void vk_ml_populate_tensor_format_properties(VkFormat format,
 {
     if (!props)
         return;
-
-    props->sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_FORMAT_PROPERTIES_KHR;
-    props->pNext = NULL;
 
     if (vk_ml_is_tensor_format_supported(format)) {
         props->tensorFeatures =

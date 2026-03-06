@@ -90,6 +90,67 @@ static int test_populate_properties(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* pNext chain preservation tests (C2 remediation)                    */
+/* ------------------------------------------------------------------ */
+
+static int test_features_pnext_preserved(void)
+{
+    VkPhysicalDeviceMLPropertiesKHR chain = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = NULL,
+    };
+    VkPhysicalDeviceMLFeaturesKHR features = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+        .pNext = &chain,
+    };
+    vk_ml_populate_features(&features);
+
+    if (features.sType != (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR)
+        return 1;
+    if (features.pNext != &chain)
+        return 1;
+    return 0;
+}
+
+static int test_properties_pnext_preserved(void)
+{
+    VkPhysicalDeviceMLFeaturesKHR chain = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+        .pNext = NULL,
+    };
+    VkPhysicalDeviceMLPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR,
+        .pNext = &chain,
+    };
+    vk_ml_populate_properties(&props);
+
+    if (props.sType != (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_PROPERTIES_KHR)
+        return 1;
+    if (props.pNext != &chain)
+        return 1;
+    return 0;
+}
+
+static int test_format_props_pnext_preserved(void)
+{
+    VkPhysicalDeviceMLFeaturesKHR chain = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ML_FEATURES_KHR,
+        .pNext = NULL,
+    };
+    VkTensorFormatPropertiesKHR props = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_FORMAT_PROPERTIES_KHR,
+        .pNext = &chain,
+    };
+    vk_ml_populate_tensor_format_properties(VK_FORMAT_R16_SFLOAT, &props);
+
+    if (props.sType != (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_FORMAT_PROPERTIES_KHR)
+        return 1;
+    if (props.pNext != &chain)
+        return 1;
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -101,6 +162,9 @@ int main(void)
     RUN_TEST(test_format_unsupported);
     RUN_TEST(test_populate_features);
     RUN_TEST(test_populate_properties);
+    RUN_TEST(test_features_pnext_preserved);
+    RUN_TEST(test_properties_pnext_preserved);
+    RUN_TEST(test_format_props_pnext_preserved);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);
