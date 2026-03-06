@@ -11,6 +11,7 @@
 #define VK_ML_INTERNAL_H_
 
 #include <vulkan/vulkan_ml_primitives.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +87,7 @@ static inline void *vk_ml_alloc(const VkAllocationCallbacks *pAllocator,
                                 size_t size) {
     if (pAllocator && pAllocator->pfnAllocation) {
         return pAllocator->pfnAllocation(
-            pAllocator->pUserData, size, 8,
+            pAllocator->pUserData, size, _Alignof(max_align_t),
             VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
     }
     return malloc(size);

@@ -56,6 +56,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateTensorKHR(
         memcpy(tensor->strides, desc->pStrides, dimCount * sizeof(VkDeviceSize));
     }
 
+    tensor->description.pDimensions = tensor->dimensions;
+    tensor->description.pStrides = tensor->strides;
+    tensor->description.pNext = NULL;
+
     if (pCreateInfo->queueFamilyIndexCount > 0 && pCreateInfo->pQueueFamilyIndices) {
         tensor->queueFamilyIndices = (uint32_t*)vk_ml_alloc(pAllocator,
             pCreateInfo->queueFamilyIndexCount * sizeof(uint32_t));
@@ -106,7 +110,7 @@ VKAPI_ATTR void VKAPI_CALL vkGetTensorMemoryRequirementsKHR(
     const VkTensorDescriptionKHR* desc = &t->description;
 
     VkDeviceSize elementCount = 1;
-    const uint32_t* dims = t->dimensions ? t->dimensions : desc->pDimensions;
+    const uint32_t* dims = desc->pDimensions;
     if (dims && desc->dimensionCount > 0) {
         for (uint32_t i = 0; i < desc->dimensionCount; i++)
             elementCount *= (VkDeviceSize)dims[i];

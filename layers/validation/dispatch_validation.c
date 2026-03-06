@@ -22,6 +22,13 @@ VkBool32 vk_ml_validate_dispatch(
     if (pDispatchInfo->inputTensorCount == 0 || pDispatchInfo->outputTensorCount == 0)
         return VK_FALSE;
 
+    if (!pDispatchInfo->pInputTensors)
+        return VK_FALSE;
+    if (!pDispatchInfo->pOutputTensors)
+        return VK_FALSE;
+    if (pDispatchInfo->weightTensorCount > 0 && !pDispatchInfo->pWeightTensors)
+        return VK_FALSE;
+
     /* VUID_DISPATCH_WEIGHT_COUNT - weightTensorCount must match graph's constantWeightCount */
     /* Stub: full count matching requires graph context */
 

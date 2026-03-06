@@ -58,6 +58,9 @@ VkBool32 vk_ml_validate_graph_create(
     if (pCreateInfo->externalOutputCount == 0)
         return VK_FALSE;
 
+    if (!pCreateInfo->pNodes)
+        return VK_FALSE;
+
     /* VUID_ML_GRAPH_DAG - cycle detection via DFS */
     if (pCreateInfo->pNodes) {
         uint8_t color[VK_ML_REF_MAX_ML_GRAPH_NODE_COUNT];

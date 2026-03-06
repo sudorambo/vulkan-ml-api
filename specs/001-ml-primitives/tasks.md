@@ -524,6 +524,186 @@ Total: 7 tasks. All test tasks parallel. All fix tasks parallel.
 
 ## Notes
 
+## Phase 12: Review Remediation — H1 (Dangling Description Pointers in Tensor)
+
+**Purpose**: Fix HIGH finding H1 — `vkCreateTensorKHR` shallow-copies `VkTensorDescriptionKHR` leaving `description.pDimensions` and `description.pStrides` as dangling pointers after the caller frees its arrays. `vkGetTensorMemoryRequirementsKHR` has a latent use-after-free fallback path through these stale pointers.
+
+**Precondition**: Phase 11 complete. All 12 tests passing.
+
+### Sub-phase 12a: Test-first — prove tensor owns its description data
+
+- [X] T099 Add `test_tensor_description_owns_dims` to `tests/cts/test_tensor_lifecycle.c`: create a tensor with stack-allocated `dims[]` and `strides[]`, then overwrite the stack arrays with garbage (e.g. `memset(dims, 0xFF, ...)`), call `vkGetTensorMemoryRequirementsKHR`, and verify the returned memory size matches the original dimensions (proving the tensor used its deep-copied data, not the now-corrupted stack). Destroy tensor. Register in `main()`.
+
+### Sub-phase 12b: Fix — redirect description pointers and simplify fallback
+
+- [X] T100 In `vkCreateTensorKHR` in `src/tensor.c`, after the strides deep-copy block (after line 57), add 3 lines: `tensor->description.pDimensions = tensor->dimensions;` `tensor->description.pStrides = tensor->strides;` `tensor->description.pNext = NULL;` — this makes `tensor->description` fully self-consistent with owned data.
+
+- [X] T101 In `vkGetTensorMemoryRequirementsKHR` in `src/tensor.c`, replace `const uint32_t* dims = t->dimensions ? t->dimensions : desc->pDimensions;` (line 109) with `const uint32_t* dims = desc->pDimensions;` — the ternary fallback is now dead code since `desc->pDimensions` always equals `t->dimensions` after the fix above.
+
+### Sub-phase 12c: Build + test verification
+
+- [X] T102 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the new `test_tensor_description_owns_dims` test.
+
+**Checkpoint**: Tensor description pointers are always owned by the tensor object. No dangling pointer paths remain. All existing tests still pass.
+
+---
+
+### Phase 12 Dependencies
+
+```text
+Sub-phase 12a (test):   T099 — single test
+Sub-phase 12b (fix):    T100, T101 — sequential (T101 depends on T100)
+Sub-phase 12c (verify): T102 — depends on all above
+
+Total: 4 tasks. 1 test, 2 code changes (sequential), 1 verification.
+```
+
+---
+
+## Phase 13: Review Remediation — H2 (Hardcoded Alignment in vk_ml_alloc)
+
+**Purpose**: Fix HIGH finding H2 — `vk_ml_alloc` passes a hardcoded alignment of `8` to the Vulkan allocation callback. This is insufficient for types requiring stricter alignment and doesn't match `malloc`'s `_Alignof(max_align_t)` guarantee. Replace with `_Alignof(max_align_t)` for portability.
+
+**Precondition**: Phase 12 complete. All 12 tests passing.
+
+### Sub-phase 13a: Test-first — verify allocation callback receives correct alignment
+
+- [X] T103 Add `test_alloc_callback_alignment` to `tests/cts/test_tensor_lifecycle.c`: define a custom `VkAllocationCallbacks` whose `pfnAllocation` captures the `alignment` argument into a static variable, call `vkCreateTensorKHR` with those callbacks, verify the captured alignment is >= `_Alignof(max_align_t)`. Clean up with `vkDestroyTensorKHR`. Register in `main()`.
+
+### Sub-phase 13b: Fix — use _Alignof(max_align_t) in vk_ml_alloc
+
+- [X] T104 In `src/internal.h`, add `#include <stddef.h>` after the existing `#include <string.h>` (line 16) — provides `max_align_t` per C11.
+
+- [X] T105 In `src/internal.h`, in `vk_ml_alloc`, replace the hardcoded `8` (line 89) with `_Alignof(max_align_t)`.
+
+### Sub-phase 13c: Build + test verification
+
+- [X] T106 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the new `test_alloc_callback_alignment` test.
+
+**Checkpoint**: Allocation callback alignment matches `malloc` guarantee. All callers automatically pick up the fix. All existing tests still pass.
+
+---
+
+### Phase 13 Dependencies
+
+```text
+Sub-phase 13a (test):   T103 — single test
+Sub-phase 13b (fix):    T104, T105 — sequential (T105 depends on T104 for max_align_t)
+Sub-phase 13c (verify): T106 — depends on all above
+
+Total: 4 tasks. 1 test, 2 code changes (sequential), 1 verification.
+```
+
+---
+
+## Phase 14: Review Remediation — H3 (Integer Overflow in Dimension Product)
+
+**Purpose**: Fix HIGH finding H3 — `uint64_t product` in `vk_ml_validate_tensor_create` can silently wrap when multiplying large dimensions, causing the validation check `product > maxTensorElements` to incorrectly pass. Add an overflow guard before each multiplication.
+
+**Precondition**: Phase 13 complete. All 12 tests passing.
+
+### Sub-phase 14a: Test-first — prove overflow is detected
+
+- [X] T107 Add `test_dimension_product_overflow` to `tests/unit/test_descriptor_validation.c`: create a `VkTensorCreateInfoKHR` with 4 dimensions of 65536 each (product = 2^64, wraps to 0), set `maxTensorElements` to `(1ULL << 32)`, call `vk_ml_validate_tensor_create`, and verify it returns `VK_FALSE`. Register in `main()`.
+
+### Sub-phase 14b: Fix — add overflow guard in dimension loop
+
+- [X] T108 In `vk_ml_validate_tensor_create` in `layers/validation/tensor_validation.c`, inside the dimension loop (after the per-dimension bounds check on line 37-38), add an overflow guard before `product *= desc->pDimensions[i]` (line 39): `if (product > props->maxTensorElements / desc->pDimensions[i]) return VK_FALSE;` — this rejects dimensions whose cumulative product would exceed `maxTensorElements` without ever overflowing.
+
+### Sub-phase 14c: Build + test verification
+
+- [X] T109 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the new `test_dimension_product_overflow` test.
+
+**Checkpoint**: Dimension product overflow is caught before it occurs. Validation correctly rejects tensors whose total element count exceeds `maxTensorElements`. All existing tests still pass.
+
+---
+
+### Phase 14 Dependencies
+
+```text
+Sub-phase 14a (test):   T107 — single test
+Sub-phase 14b (fix):    T108 — single change
+Sub-phase 14c (verify): T109 — depends on all above
+
+Total: 3 tasks. 1 test, 1 code change, 1 verification.
+```
+
+---
+
+## Phase 15: Review Remediation — H4 (NULL pNodes with nodeCount > 0)
+
+**Purpose**: Fix HIGH finding H4 — `vk_ml_validate_graph_create` accepts `pNodes == NULL` when `nodeCount > 0`, skipping DFS cycle detection entirely. Downstream `vkCreateMLGraphKHR` will dereference the NULL pointer and crash.
+
+**Precondition**: Phase 14 complete. All 12 tests passing.
+
+### Sub-phase 15a: Test-first — prove NULL pNodes is rejected
+
+- [X] T110 [P] Add `test_null_pnodes_with_nodecount` to `tests/unit/test_dag_validation.c`: set `nodeCount = 1` and `pNodes = NULL` in a `VkMLGraphCreateInfoKHR`, call `vk_ml_validate_graph_create`, and verify it returns `VK_FALSE`. Register in `main()`.
+
+### Sub-phase 15b: Fix — add null guard before DFS block
+
+- [X] T111 In `vk_ml_validate_graph_create` in `layers/validation/graph_validation.c`, add `if (!pCreateInfo->pNodes) return VK_FALSE;` before the DFS block (before line 62). Since `nodeCount > 0` is guaranteed at this point (line 50 rejects 0), a NULL `pNodes` pointer is invalid.
+
+### Sub-phase 15c: Build + test verification
+
+- [X] T112 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the new `test_null_pnodes_with_nodecount` test.
+
+**Checkpoint**: NULL `pNodes` with `nodeCount > 0` is correctly rejected. No null-dereference path remains. All existing tests still pass.
+
+---
+
+### Phase 15 Dependencies
+
+```text
+Sub-phase 15a (test):   T110 — single test
+Sub-phase 15b (fix):    T111 — single change
+Sub-phase 15c (verify): T112 — depends on all above
+
+Total: 3 tasks. 1 test, 1 code change, 1 verification.
+```
+
+---
+
+## Phase 16: Review Remediation — H5 (Dispatch Validation NULL Array Pointers)
+
+**Purpose**: Fix HIGH finding H5 — `vk_ml_validate_dispatch` doesn't check that `pInputTensors`, `pOutputTensors`, and `pWeightTensors` are non-NULL when their respective counts are > 0. Passing NULL arrays with positive counts will cause downstream NULL dereferences.
+
+**Precondition**: Phase 15 complete. All 12 tests passing.
+
+### Sub-phase 16a: Test-first — prove NULL array pointers are rejected
+
+- [X] T113 Add `test_dispatch_null_input_tensors` to `tests/cts/test_ml_dispatch.c`: set `inputTensorCount = 1` and `pInputTensors = NULL`, call `vk_ml_validate_dispatch`, verify it returns `VK_FALSE`. Register in `main()`.
+
+- [X] T114 Add `test_dispatch_null_output_tensors` to `tests/cts/test_ml_dispatch.c`: set `outputTensorCount = 1` and `pOutputTensors = NULL`, call `vk_ml_validate_dispatch`, verify it returns `VK_FALSE`. Register in `main()`.
+
+- [X] T115 Add `test_dispatch_null_weight_tensors` to `tests/cts/test_ml_dispatch.c`: set `weightTensorCount = 1` and `pWeightTensors = NULL`, call `vk_ml_validate_dispatch`, verify it returns `VK_FALSE`. Register in `main()`.
+
+### Sub-phase 16b: Fix — add NULL array guards
+
+- [X] T116 In `vk_ml_validate_dispatch` in `layers/validation/dispatch_validation.c`, after the count checks (line 23), add 3 NULL-pointer guards: `if (!pDispatchInfo->pInputTensors) return VK_FALSE;` `if (!pDispatchInfo->pOutputTensors) return VK_FALSE;` `if (pDispatchInfo->weightTensorCount > 0 && !pDispatchInfo->pWeightTensors) return VK_FALSE;`
+
+### Sub-phase 16c: Build + test verification
+
+- [X] T117 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all tests pass including the 3 new dispatch NULL-pointer tests.
+
+**Checkpoint**: Dispatch validation rejects NULL tensor arrays when counts are positive. No NULL-dereference paths remain. All existing tests still pass.
+
+---
+
+### Phase 16 Dependencies
+
+```text
+Sub-phase 16a (tests):  T113, T114, T115 — all in same file, sequential
+Sub-phase 16b (fix):    T116 — single change
+Sub-phase 16c (verify): T117 — depends on all above
+
+Total: 5 tasks. 3 tests, 1 code change, 1 verification.
+```
+
+---
+
+## Notes
+
 - [P] tasks = different files, no dependencies on incomplete tasks
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable

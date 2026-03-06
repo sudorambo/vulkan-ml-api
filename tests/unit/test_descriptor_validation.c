@@ -365,6 +365,41 @@ static void test_elem_invalid_op(void)
     expect("test_elem_invalid_op", r, VK_FALSE);
 }
 
+static void test_dimension_product_overflow(void)
+{
+    VkPhysicalDeviceMLFeaturesKHR features = {0};
+    vk_ml_populate_features(&features);
+
+    VkPhysicalDeviceMLPropertiesKHR props = {0};
+    props.maxTensorDimensions = 8;
+    props.maxTensorDimensionSize = 65536;
+    props.maxTensorElements = (1ULL << 32);
+
+    uint32_t dims[] = {65536, 65536, 65536, 65536};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R16_SFLOAT,
+        .dimensionCount = 4,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+
+    VkBool32 r = vk_ml_validate_tensor_create(&createInfo, &features, &props);
+    expect("test_dimension_product_overflow", r, VK_FALSE);
+}
+
 int main(void)
 {
     passed = 0;
@@ -385,6 +420,7 @@ int main(void)
     test_norm_invalid_type();
     test_valid_elementwise();
     test_elem_invalid_op();
+    test_dimension_product_overflow();
 
     (void)printf("\nTotal: %d passed, %d failed\n", passed, failed);
     return failed == 0 ? 0 : 1;

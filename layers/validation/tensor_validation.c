@@ -36,6 +36,8 @@ VkBool32 vk_ml_validate_tensor_create(
         /* VUID_TENSOR_DESC_DIM_VALUES */
         if (desc->pDimensions[i] == 0 || desc->pDimensions[i] > props->maxTensorDimensionSize)
             return VK_FALSE;
+        if (product > props->maxTensorElements / desc->pDimensions[i])
+            return VK_FALSE;
         product *= desc->pDimensions[i];
     }
 

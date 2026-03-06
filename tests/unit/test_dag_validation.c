@@ -581,6 +581,45 @@ static void test_zero_external_outputs(void)
     expect("test_zero_external_outputs", r, VK_FALSE);
 }
 
+static void test_null_pnodes_with_nodecount(void)
+{
+    VkPhysicalDeviceMLFeaturesKHR features = {0};
+    vk_ml_populate_features(&features);
+
+    VkPhysicalDeviceMLPropertiesKHR props = {0};
+    vk_ml_populate_properties(&props);
+
+    VkTensorDescriptionKHR input_desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R16_SFLOAT,
+        .dimensionCount = 1,
+        .pDimensions = (uint32_t[]){4},
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+
+    VkTensorDescriptionKHR output_desc = input_desc;
+
+    VkMLGraphCreateInfoKHR create_info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .nodeCount = 1,
+        .pNodes = NULL,
+        .externalInputCount = 1,
+        .pExternalInputDescriptions = &input_desc,
+        .externalOutputCount = 1,
+        .pExternalOutputDescriptions = &output_desc,
+        .constantWeightCount = 0,
+        .pConstantWeightDescriptions = NULL,
+    };
+
+    VkBool32 r = vk_ml_validate_graph_create(&create_info, &features, &props);
+    expect("test_null_pnodes_with_nodecount", r, VK_FALSE);
+}
+
 int main(void)
 {
     passed = 0;
@@ -594,6 +633,7 @@ int main(void)
     test_cyclic_graph();
     test_self_reference();
     test_invalid_node_index();
+    test_null_pnodes_with_nodecount();
 
     (void)printf("\nTotal: %d passed, %d failed\n", passed, failed);
     return failed == 0 ? 0 : 1;

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 #include <assert.h>
 
 static int g_fail_count = 0;
@@ -220,6 +221,124 @@ static int test_create_multiple_formats(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Ownership tests (H1 remediation)                                   */
+/* ------------------------------------------------------------------ */
+
+static int test_tensor_description_owns_dims(void)
+{
+    uint32_t dims[] = {2, 3, 4, 5};
+    VkDeviceSize strides[] = {120, 40, 10, 2};
+    VkDeviceSize expected_size = (VkDeviceSize)(2 * 3 * 4 * 5) * 2; /* fp16 = 2 bytes */
+
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R16_SFLOAT,
+        .dimensionCount = 4,
+        .pDimensions = dims,
+        .pStrides = strides,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &createInfo, NULL, &tensor);
+    if (r != VK_SUCCESS || tensor == VK_NULL_HANDLE)
+        return 1;
+
+    memset(dims, 0xFF, sizeof(dims));
+    memset(strides, 0xFF, sizeof(strides));
+
+    VkTensorMemoryRequirementsInfoKHR reqInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_REQUIREMENTS_INFO_KHR,
+        .pNext = NULL,
+        .tensor = tensor,
+    };
+    VkMemoryRequirements2 memReq = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = NULL,
+    };
+    vkGetTensorMemoryRequirementsKHR(VK_NULL_HANDLE, &reqInfo, &memReq);
+
+    int ok = (memReq.memoryRequirements.size == expected_size);
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+    return ok ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Allocation alignment tests (H2 remediation)                        */
+/* ------------------------------------------------------------------ */
+
+static size_t s_captured_alignment = 0;
+
+static void *VKAPI_PTR capturing_alloc(void *pUserData, size_t size,
+                                       size_t alignment,
+                                       VkSystemAllocationScope scope)
+{
+    (void)pUserData;
+    (void)scope;
+    s_captured_alignment = alignment;
+    return malloc(size);
+}
+
+static void VKAPI_PTR capturing_free(void *pUserData, void *pMemory)
+{
+    (void)pUserData;
+    free(pMemory);
+}
+
+static int test_alloc_callback_alignment(void)
+{
+    VkAllocationCallbacks cbs = {
+        .pUserData = NULL,
+        .pfnAllocation = capturing_alloc,
+        .pfnReallocation = NULL,
+        .pfnFree = capturing_free,
+        .pfnInternalAllocation = NULL,
+        .pfnInternalFree = NULL,
+    };
+
+    uint32_t dims[] = {1, 2, 3, 4};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R16_SFLOAT,
+        .dimensionCount = 4,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR createInfo = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+
+    s_captured_alignment = 0;
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &createInfo, &cbs, &tensor);
+    if (r != VK_SUCCESS || tensor == VK_NULL_HANDLE)
+        return 1;
+
+    int ok = (s_captured_alignment >= _Alignof(max_align_t));
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, &cbs);
+    return ok ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -231,6 +350,8 @@ int main(void)
     RUN_TEST(test_bind_memory);
     RUN_TEST(test_destroy_null_handle);
     RUN_TEST(test_create_multiple_formats);
+    RUN_TEST(test_tensor_description_owns_dims);
+    RUN_TEST(test_alloc_callback_alignment);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);

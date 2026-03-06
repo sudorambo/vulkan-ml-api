@@ -44,23 +44,25 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H1 — Dangling description pointers in tensor
 
-- [ ] **File**: `src/tensor.c:29, 109`
+- [x] **File**: `src/tensor.c:29, 109`
 - **Description**: `tensor->description = *desc` shallow-copies the `VkTensorDescriptionKHR` including its `pDimensions` and `pStrides` pointers. The arrays are deep-copied into `tensor->dimensions`/`tensor->strides`, but `tensor->description.pDimensions` still points to the caller's (possibly freed) memory. The fallback path in `vkGetTensorMemoryRequirementsKHR` at line 109 is a latent use-after-free.
 - **Fix**: After deep-copying dimensions/strides, update the description's pointers:
   ```c
   tensor->description.pDimensions = tensor->dimensions;
   tensor->description.pStrides = tensor->strides;
   ```
+- **FIXED**: Phase 12 (T099-T102). Redirected `description.pDimensions`/`pStrides` to owned copies, nulled `pNext`. Simplified fallback in `vkGetTensorMemoryRequirementsKHR`. Added CTS ownership test.
 
 ### H2 — Hardcoded alignment of 8 in vk_ml_alloc
 
-- [ ] [P] **File**: `src/internal.h:89`
+- [x] [P] **File**: `src/internal.h:89`
 - **Description**: `vk_ml_alloc` passes a hardcoded alignment of `8` to the Vulkan allocation callback. This is insufficient for types requiring stricter alignment. `malloc` guarantees `_Alignof(max_align_t)`, but the callback path doesn't.
 - **Fix**: Add an `alignment` parameter to `vk_ml_alloc`, or use `_Alignof(max_align_t)` as the default. Update all callers.
+- **FIXED**: Phase 13 (T103-T106). Replaced hardcoded `8` with `_Alignof(max_align_t)`. Added `#include <stddef.h>`. Added CTS test verifying callback alignment.
 
 ### H3 — Integer overflow in dimension product validation
 
-- [ ] **File**: `layers/validation/tensor_validation.c:34-44`
+- [x] **File**: `layers/validation/tensor_validation.c:34-44`
 - **Description**: `uint64_t product` can silently wrap when multiplying large dimensions (e.g., 4 dims of 65536 = 2^64, wraps to 0). The overflow causes `0 > maxTensorElements` to be false, so validation incorrectly passes.
 - **Fix**: Check for overflow before each multiplication:
   ```c
@@ -69,22 +71,25 @@ Work through findings top-down by severity. Some fixes are independent and can b
       return VK_FALSE;
   product *= desc->pDimensions[i];
   ```
+- **FIXED**: Phase 14 (T107-T109). Added overflow guard `product > maxTensorElements / dim` before each multiplication. Added unit test with 4 dims of 65536.
 
 ### H4 — NULL `pNodes` accepted with `nodeCount > 0`
 
-- [ ] **File**: `layers/validation/graph_validation.c:62`
+- [x] **File**: `layers/validation/graph_validation.c:62`
 - **Description**: DFS cycle detection is guarded by `if (pCreateInfo->pNodes)`. If `pNodes == NULL` but `nodeCount > 0`, validation passes. Downstream code that dereferences `pNodes` will crash.
 - **Fix**: Add before the DFS block:
   ```c
   if (pCreateInfo->nodeCount > 0 && !pCreateInfo->pNodes)
       return VK_FALSE;
   ```
+- **FIXED**: Phase 15 (T110-T112). Added `if (!pCreateInfo->pNodes) return VK_FALSE;` guard before DFS block. Added unit test with `nodeCount=1, pNodes=NULL`.
 
 ### H5 — Dispatch validation structurally incomplete
 
-- [ ] **File**: `layers/validation/dispatch_validation.c`
+- [x] **File**: `layers/validation/dispatch_validation.c`
 - **Description**: `vk_ml_validate_dispatch` only checks `session != NULL` and counts `!= 0`. It doesn't verify counts match graph expectations (no graph/session context available), doesn't check tensor array pointers are non-NULL when counts > 0, and doesn't check tensor usage flags.
 - **Fix**: (a) Add NULL-array checks for `pInputTensors`/`pOutputTensors`/`pWeightTensors` when respective counts > 0. (b) Expand the function signature to accept graph context for count matching (longer-term).
+- **FIXED** (partial): Phase 16 (T113-T117). Added 3 NULL-pointer guards for tensor arrays. Count-matching deferred (requires architectural change to thread graph context).
 
 ### H6 — Barrier validation lives in wrong directory
 

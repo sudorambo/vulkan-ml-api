@@ -4,6 +4,7 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
+#include "../../layers/validation/vk_ml_validation.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -381,6 +382,58 @@ static int test_dispatch_multiple_ios(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* NULL array pointer tests (H5 remediation)                          */
+/* ------------------------------------------------------------------ */
+
+static int test_dispatch_null_input_tensors(void)
+{
+    VkMLGraphDispatchInfoKHR info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR,
+        .pNext = NULL,
+        .session = (VkMLSessionKHR)(uintptr_t)0x1,
+        .inputTensorCount = 1,
+        .pInputTensors = NULL,
+        .outputTensorCount = 1,
+        .pOutputTensors = (const VkTensorKHR[]){(VkTensorKHR)(uintptr_t)0x2},
+        .weightTensorCount = 0,
+        .pWeightTensors = NULL,
+    };
+    return vk_ml_validate_dispatch(&info) == VK_FALSE ? 0 : 1;
+}
+
+static int test_dispatch_null_output_tensors(void)
+{
+    VkMLGraphDispatchInfoKHR info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR,
+        .pNext = NULL,
+        .session = (VkMLSessionKHR)(uintptr_t)0x1,
+        .inputTensorCount = 1,
+        .pInputTensors = (const VkTensorKHR[]){(VkTensorKHR)(uintptr_t)0x2},
+        .outputTensorCount = 1,
+        .pOutputTensors = NULL,
+        .weightTensorCount = 0,
+        .pWeightTensors = NULL,
+    };
+    return vk_ml_validate_dispatch(&info) == VK_FALSE ? 0 : 1;
+}
+
+static int test_dispatch_null_weight_tensors(void)
+{
+    VkMLGraphDispatchInfoKHR info = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR,
+        .pNext = NULL,
+        .session = (VkMLSessionKHR)(uintptr_t)0x1,
+        .inputTensorCount = 1,
+        .pInputTensors = (const VkTensorKHR[]){(VkTensorKHR)(uintptr_t)0x2},
+        .outputTensorCount = 1,
+        .pOutputTensors = (const VkTensorKHR[]){(VkTensorKHR)(uintptr_t)0x3},
+        .weightTensorCount = 1,
+        .pWeightTensors = NULL,
+    };
+    return vk_ml_validate_dispatch(&info) == VK_FALSE ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -388,6 +441,9 @@ int main(void)
 {
     RUN_TEST(test_dispatch_basic);
     RUN_TEST(test_dispatch_multiple_ios);
+    RUN_TEST(test_dispatch_null_input_tensors);
+    RUN_TEST(test_dispatch_null_output_tensors);
+    RUN_TEST(test_dispatch_null_weight_tensors);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);
