@@ -5,7 +5,7 @@ project(vulkan_ml_primitives
     DESCRIPTION "VK_KHR_ml_primitives Vulkan extension reference implementation"
 )
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -18,6 +18,8 @@ if(MSVC)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
+
+option(BUILD_TESTING "Build tests and examples" ON)
 
 # --------------------------------------------------------------------------
 # Library: vk_ml_primitives (reference ICD layer implementation)
@@ -60,8 +62,21 @@ target_include_directories(vk_ml_validation
 target_link_libraries(vk_ml_validation PUBLIC Vulkan::Vulkan)
 
 # --------------------------------------------------------------------------
+# Install targets
+# --------------------------------------------------------------------------
+install(TARGETS vk_ml_primitives vk_ml_validation
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+install(DIRECTORY include/vulkan
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# --------------------------------------------------------------------------
 # Tests
 # --------------------------------------------------------------------------
+if(BUILD_TESTING)
 enable_testing()
 
 set(CTS_TESTS
@@ -117,6 +132,8 @@ endforeach()
 add_executable(quickstart examples/quickstart.c)
 target_include_directories(quickstart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(quickstart PRIVATE vk_ml_primitives)
+
+endif() # BUILD_TESTING
 
 # --------------------------------------------------------------------------
 # Static analysis (T003)

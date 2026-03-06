@@ -307,13 +307,15 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L5 — C standard set to C11, constitution prefers C17
 
-- [ ] [P] **File**: `CMakeLists.txt:8`
+- [x] [P] **File**: `CMakeLists.txt:8`
 - **Fix**: Change `set(CMAKE_C_STANDARD 11)` to `set(CMAKE_C_STANDARD 17)`.
+- **FIXED**: Phase 42 (T200-T201). Changed `CMAKE_C_STANDARD` from 11 to 17. Full reconfigure + build: zero warnings. All 13 tests pass.
 
 ### L6 — No install target or BUILD_TESTING guard
 
-- [ ] [P] **File**: `CMakeLists.txt`
+- [x] [P] **File**: `CMakeLists.txt`
 - **Fix**: Add `option(BUILD_TESTING "Build tests" ON)`, wrap test block in `if(BUILD_TESTING)`, add `install()` commands for library and header.
+- **FIXED**: Phase 43 (T202-T204). Added `BUILD_TESTING` option guarding tests/examples, and `install()` targets for `libvk_ml_primitives.a`, `libvk_ml_validation.a`, and `vulkan_ml_primitives.h`. All 13 tests pass. Install verified.
 
 ### L7 — Inconsistent include paths for internal.h in tests
 

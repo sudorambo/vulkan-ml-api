@@ -1553,6 +1553,54 @@ Total: 2 tasks.
 
 ---
 
+### Phase 42: Review Remediation — L5 (C standard set to C11, constitution prefers C17)
+
+**Goal**: Upgrade the C standard from C11 to C17 to align with constitution preference.
+
+- [X] T200 In `CMakeLists.txt`, change `set(CMAKE_C_STANDARD 11)` to `set(CMAKE_C_STANDARD 17)`.
+
+- [X] T201 Reconfigure and build with `cmake -B build && cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Project now compiles under C17 per constitution preference.
+
+---
+
+### Phase 42 Dependencies
+
+```text
+T200 — standalone
+T201 — depends on T200
+
+Total: 2 tasks.
+```
+
+---
+
+### Phase 43: Review Remediation — L6 (No install target or BUILD\_TESTING guard)
+
+**Goal**: Add `BUILD_TESTING` option to guard test/example targets, and add `install()` commands for the library, validation layer, and public header.
+
+- [X] T202 In `CMakeLists.txt`, add `option(BUILD_TESTING "Build tests" ON)` after the compiler flags block (after line 20). Wrap the entire tests section (lines 65–112: `enable_testing()` through the unit test `foreach` loop) and the examples section (lines 117–119: quickstart executable) inside `if(BUILD_TESTING) ... endif()`.
+
+- [X] T203 In `CMakeLists.txt`, add `install()` commands after the validation library block (after line 60): install `vk_ml_primitives` and `vk_ml_validation` libraries to `lib/`, and install `include/vulkan/` header directory to `include/`.
+
+- [X] T204 Reconfigure and build with `cmake -B build && cmake --build build` — zero warnings. Run `ctest --test-dir build --output-on-failure` — all 13 tests pass. Then verify install works: `cmake --install build --prefix /tmp/vk_ml_install && ls /tmp/vk_ml_install/lib/ /tmp/vk_ml_install/include/vulkan/`.
+
+**Checkpoint**: Library is installable. Tests can be disabled with `-DBUILD_TESTING=OFF`.
+
+---
+
+### Phase 43 Dependencies
+
+```text
+T202, T203 — sequential (same file, T203 line numbers depend on T202 insertions)
+T204 — depends on T202, T203
+
+Total: 3 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
