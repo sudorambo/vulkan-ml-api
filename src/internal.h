@@ -62,6 +62,7 @@ typedef struct VkMLSessionKHR_T {
     VkDeviceSize scratchMemoryOffset;
     VkDeviceSize scratchMemorySize;
     VkBool32 autoAllocated;
+    void *autoScratchHost;
 } VkMLSessionKHR_T;
 
 /* ------------------------------------------------------------------ */

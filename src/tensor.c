@@ -107,15 +107,18 @@ vkGetTensorMemoryRequirementsKHR(VkDevice device, const VkTensorMemoryRequiremen
     VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)pInfo->tensor;
     const VkTensorDescriptionKHR *desc = &t->description;
 
-    VkDeviceSize elementCount = 1;
-    const uint32_t *dims = desc->pDimensions;
-    if (dims && desc->dimensionCount > 0) {
-        for (uint32_t i = 0; i < desc->dimensionCount; i++)
-            elementCount *= (VkDeviceSize)dims[i];
-    }
+    VkDeviceSize size;
 
-    uint32_t elemSize = vk_ml_format_element_size(desc->format);
-    VkDeviceSize size = elementCount * elemSize;
+    if (desc->pStrides && desc->dimensionCount > 0) {
+        size = (VkDeviceSize)desc->pDimensions[0] * desc->pStrides[0];
+    } else {
+        VkDeviceSize elementCount = 1;
+        if (desc->pDimensions && desc->dimensionCount > 0) {
+            for (uint32_t i = 0; i < desc->dimensionCount; i++)
+                elementCount *= (VkDeviceSize)desc->pDimensions[i];
+        }
+        size = elementCount * vk_ml_format_element_size(desc->format);
+    }
 
     pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
     pMemoryRequirements->pNext = NULL;
@@ -137,11 +140,16 @@ VKAPI_ATTR VkResult VKAPI_CALL vkBindTensorMemoryKHR(VkDevice device, uint32_t b
             return VK_ERROR_UNKNOWN;
 
         VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)info->tensor;
+
+        /* VUID-VkBindTensorMemoryInfoKHR-tensor-00001 */
         if (t->memoryBound)
-            return VK_ERROR_UNKNOWN;
+            return VK_ERROR_VALIDATION_FAILED_EXT;
+
+        /* VUID-VkBindTensorMemoryInfoKHR-memoryOffset-00002 */
         if (VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN > 0 &&
             info->memoryOffset % VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN != 0)
-            return VK_ERROR_UNKNOWN;
+            return VK_ERROR_VALIDATION_FAILED_EXT;
+
         t->boundMemory = info->memory;
         t->memoryOffset = info->memoryOffset;
         t->memoryBound = VK_TRUE;

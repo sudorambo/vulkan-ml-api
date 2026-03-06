@@ -52,7 +52,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(VkDevice device,
                 vk_ml_free(pAllocator, session);
                 return VK_ERROR_OUT_OF_HOST_MEMORY;
             }
-            session->scratchMemory = (VkDeviceMemory)(uintptr_t)scratch;
+            session->autoScratchHost = scratch;
             session->scratchMemoryOffset = 0;
             session->scratchMemorySize = needed;
             session->autoAllocated = VK_TRUE;
@@ -71,7 +71,7 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyMLSessionKHR(VkDevice device, VkMLSessionKHR
         return;
 
     VkMLSessionKHR_T *s = (VkMLSessionKHR_T *)(uintptr_t)session;
-    if (s->autoAllocated && s->scratchMemory != VK_NULL_HANDLE)
-        vk_ml_free(pAllocator, (void *)(uintptr_t)s->scratchMemory);
+    if (s->autoAllocated)
+        vk_ml_free(pAllocator, s->autoScratchHost);
     vk_ml_free(pAllocator, s);
 }

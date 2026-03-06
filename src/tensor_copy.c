@@ -8,6 +8,10 @@
 
 #include <vulkan/vulkan_ml_primitives.h>
 
+#ifdef VK_ML_REF_ENABLE_VALIDATION
+#include "vk_ml_validation.h"
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Tensor copy command                                                */
 /* ------------------------------------------------------------------ */
@@ -15,11 +19,14 @@
 VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(VkCommandBuffer commandBuffer,
                                               const VkCopyTensorInfoKHR *pCopyInfo)
 {
-    (void)commandBuffer;
-    (void)pCopyInfo;
-
     if (!commandBuffer || !pCopyInfo)
         return;
+
+#ifdef VK_ML_REF_ENABLE_VALIDATION
+    if (vk_ml_validate_tensor_copy(pCopyInfo) == VK_FALSE)
+        return;
+#endif
+
     if ((uint32_t)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
         return;
 

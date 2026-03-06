@@ -8,6 +8,10 @@
 
 #include <vulkan/vulkan_ml_primitives.h>
 
+#ifdef VK_ML_REF_ENABLE_VALIDATION
+#include "vk_ml_validation.h"
+#endif
+
 /* ------------------------------------------------------------------ */
 /* ML graph dispatch command                                         */
 /* ------------------------------------------------------------------ */
@@ -17,6 +21,12 @@ VKAPI_ATTR void VKAPI_CALL vkCmdDispatchMLGraphKHR(VkCommandBuffer commandBuffer
 {
     if (!commandBuffer || !pDispatchInfo)
         return;
+
+#ifdef VK_ML_REF_ENABLE_VALIDATION
+    if (vk_ml_validate_dispatch(pDispatchInfo) == VK_FALSE)
+        return;
+#endif
+
     if ((uint32_t)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
         return;
 

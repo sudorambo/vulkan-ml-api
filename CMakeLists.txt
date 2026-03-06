@@ -20,6 +20,7 @@ else()
 endif()
 
 option(BUILD_TESTING "Build tests and examples" ON)
+option(VK_ML_REF_ENABLE_VALIDATION "Enable built-in validation in the ICD stubs" OFF)
 
 include(GNUInstallDirs)
 
@@ -45,6 +46,12 @@ target_include_directories(vk_ml_primitives
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
+
+if(VK_ML_REF_ENABLE_VALIDATION)
+    target_compile_definitions(vk_ml_primitives PRIVATE VK_ML_REF_ENABLE_VALIDATION)
+    target_include_directories(vk_ml_primitives PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation)
+    target_link_libraries(vk_ml_primitives PRIVATE vk_ml_validation)
+endif()
 
 # --------------------------------------------------------------------------
 # Library: vk_ml_validation (validation layer)

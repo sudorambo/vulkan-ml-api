@@ -112,6 +112,14 @@ cmake -B build -S . -DBUILD_TESTING=ON
 cmake --build build
 ```
 
+To enable built-in validation inside the ICD stubs (useful for debugging without
+manually calling validation functions):
+
+```sh
+cmake -B build -S . -DVK_ML_REF_ENABLE_VALIDATION=ON
+cmake --build build
+```
+
 The build produces two static libraries:
 
 - `libvk_ml_primitives.a` — reference ICD layer implementation
@@ -160,6 +168,16 @@ for all ML primitive operations. Every check maps to a Valid Usage ID (VUID)
 from the specification.
 
 ### Using the Validation Layer
+
+**Option A — Built-in validation (compile-time toggle):**
+
+Build with `-DVK_ML_REF_ENABLE_VALIDATION=ON` to wire validation directly into
+the ICD stubs. When enabled, `vkCmdDispatchMLGraphKHR` and `vkCmdCopyTensorKHR`
+automatically call `vk_ml_validate_dispatch()` / `vk_ml_validate_tensor_copy()`
+before executing, and return early on failure. No application code changes
+required. This is off by default so release builds are unaffected.
+
+**Option B — Manual validation calls:**
 
 Link against `vk_ml_validation` in your CMake project:
 
