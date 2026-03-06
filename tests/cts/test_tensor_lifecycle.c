@@ -480,6 +480,45 @@ static int test_tensor_linear_tiling_with_strides(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* NULL pointer argument tests                                         */
+/* ------------------------------------------------------------------ */
+
+static int test_create_tensor_null_args(void)
+{
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r1 = vkCreateTensorKHR(VK_NULL_HANDLE, NULL, NULL, &tensor);
+    if (r1 == VK_SUCCESS)
+        return 1;
+
+    VkResult r2 = vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, NULL);
+    if (r2 == VK_SUCCESS)
+        return 1;
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -495,6 +534,7 @@ int main(void)
     RUN_TEST(test_alloc_callback_alignment);
     RUN_TEST(test_tensor_concurrent_sharing);
     RUN_TEST(test_tensor_linear_tiling_with_strides);
+    RUN_TEST(test_create_tensor_null_args);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);

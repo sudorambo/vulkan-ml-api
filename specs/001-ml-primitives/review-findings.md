@@ -47,10 +47,12 @@ Work through findings top-down by severity. Some fixes are independent and can b
 - [x] **File**: `src/tensor.c:29, 109`
 - **Description**: `tensor->description = *desc` shallow-copies the `VkTensorDescriptionKHR` including its `pDimensions` and `pStrides` pointers. The arrays are deep-copied into `tensor->dimensions`/`tensor->strides`, but `tensor->description.pDimensions` still points to the caller's (possibly freed) memory. The fallback path in `vkGetTensorMemoryRequirementsKHR` at line 109 is a latent use-after-free.
 - **Fix**: After deep-copying dimensions/strides, update the description's pointers:
+
   ```c
   tensor->description.pDimensions = tensor->dimensions;
   tensor->description.pStrides = tensor->strides;
   ```
+
 - **FIXED**: Phase 12 (T099-T102). Redirected `description.pDimensions`/`pStrides` to owned copies, nulled `pNext`. Simplified fallback in `vkGetTensorMemoryRequirementsKHR`. Added CTS ownership test.
 
 ### H2 — Hardcoded alignment of 8 in vk_ml_alloc
@@ -65,12 +67,14 @@ Work through findings top-down by severity. Some fixes are independent and can b
 - [x] **File**: `layers/validation/tensor_validation.c:34-44`
 - **Description**: `uint64_t product` can silently wrap when multiplying large dimensions (e.g., 4 dims of 65536 = 2^64, wraps to 0). The overflow causes `0 > maxTensorElements` to be false, so validation incorrectly passes.
 - **Fix**: Check for overflow before each multiplication:
+
   ```c
   if (desc->pDimensions[i] != 0 &&
       product > props->maxTensorElements / desc->pDimensions[i])
       return VK_FALSE;
   product *= desc->pDimensions[i];
   ```
+
 - **FIXED**: Phase 14 (T107-T109). Added overflow guard `product > maxTensorElements / dim` before each multiplication. Added unit test with 4 dims of 65536.
 
 ### H4 — NULL `pNodes` accepted with `nodeCount > 0`
@@ -78,10 +82,12 @@ Work through findings top-down by severity. Some fixes are independent and can b
 - [x] **File**: `layers/validation/graph_validation.c:62`
 - **Description**: DFS cycle detection is guarded by `if (pCreateInfo->pNodes)`. If `pNodes == NULL` but `nodeCount > 0`, validation passes. Downstream code that dereferences `pNodes` will crash.
 - **Fix**: Add before the DFS block:
+
   ```c
   if (pCreateInfo->nodeCount > 0 && !pCreateInfo->pNodes)
       return VK_FALSE;
   ```
+  
 - **FIXED**: Phase 15 (T110-T112). Added `if (!pCreateInfo->pNodes) return VK_FALSE;` guard before DFS block. Added unit test with `nodeCount=1, pNodes=NULL`.
 
 ### H5 — Dispatch validation structurally incomplete
@@ -266,9 +272,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M19 — No NULL pointer argument tests
 
-- [ ] [P] **Files**: CTS tests
+- [x] [P] **Files**: CTS tests
 - **Description**: No test passes `NULL` for `pCreateInfo`, `pGraph`, `pSession`, or `pTensor` to validate NULL-dereference protection.
 - **Fix**: Add negative tests that pass NULL for each output/input pointer and verify the function doesn't crash (returns error or is handled by validation layer).
+- **FIXED**: Phase 39 (T191-T195). Added `test_create_tensor_null_args`, `test_create_tensor_view_null_args`, `test_create_graph_null_args`, `test_create_session_null_args` across four CTS test files. All 13 tests pass.
 
 ---
 

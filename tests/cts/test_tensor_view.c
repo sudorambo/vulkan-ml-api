@@ -229,6 +229,61 @@ static int test_view_format_reinterpret(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* NULL pointer argument tests                                         */
+/* ------------------------------------------------------------------ */
+
+static int test_create_tensor_view_null_args(void)
+{
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_SHADER_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR tci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    VkResult r = vkCreateTensorKHR(VK_NULL_HANDLE, &tci, NULL, &tensor);
+    if (r != VK_SUCCESS)
+        return 1;
+
+    VkTensorViewKHR view = VK_NULL_HANDLE;
+    VkResult r1 = vkCreateTensorViewKHR(VK_NULL_HANDLE, NULL, NULL, &view);
+    if (r1 == VK_SUCCESS) {
+        vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+        return 1;
+    }
+
+    VkTensorViewCreateInfoKHR vci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .tensor = tensor,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 0,
+        .pDimensionOffsets = NULL,
+        .pDimensionSizes = NULL,
+    };
+    VkResult r2 = vkCreateTensorViewKHR(VK_NULL_HANDLE, &vci, NULL, NULL);
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+    if (r2 == VK_SUCCESS)
+        return 1;
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -238,6 +293,7 @@ int main(void)
     RUN_TEST(test_create_view_subregion);
     RUN_TEST(test_destroy_view_null);
     RUN_TEST(test_view_format_reinterpret);
+    RUN_TEST(test_create_tensor_view_null_args);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) failed.\n", g_fail_count);

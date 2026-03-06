@@ -1478,6 +1478,35 @@ Total: 4 tasks.
 
 ---
 
+### Phase 39: Review Remediation — M19 (No NULL pointer argument tests)
+
+**Goal**: Add negative tests that pass NULL for each output/input pointer to all four creation functions and verify they return an error without crashing.
+
+- [X] T191 [P] In `tests/cts/test_tensor_lifecycle.c`, add `test_create_tensor_null_args`: call `vkCreateTensorKHR` with (a) `pCreateInfo = NULL, pTensor = valid` and (b) `pCreateInfo = valid, pTensor = NULL`. Assert both return non-`VK_SUCCESS`. Register with `RUN_TEST()` in `main()`.
+
+- [X] T192 [P] In `tests/cts/test_tensor_view.c`, add `test_create_tensor_view_null_args`: call `vkCreateTensorViewKHR` with (a) `pCreateInfo = NULL, pView = valid` and (b) `pCreateInfo = valid (with real tensor handle), pView = NULL`. Assert both return non-`VK_SUCCESS`. Register with `RUN_TEST()` in `main()`.
+
+- [X] T193 [P] In `tests/cts/test_ml_graph.c`, add `test_create_graph_null_args`: call `vkCreateMLGraphKHR` with (a) `pCreateInfo = NULL, pGraph = valid` and (b) `pCreateInfo = valid, pGraph = NULL`. Assert both return non-`VK_SUCCESS`. Register with `RUN_TEST()` in `main()`.
+
+- [X] T194 [P] In `tests/cts/test_ml_session.c`, add `test_create_session_null_args`: call `vkCreateMLSessionKHR` with (a) `pCreateInfo = NULL, pSession = valid` and (b) `pCreateInfo = valid (with real graph handle), pSession = NULL`. Assert both return non-`VK_SUCCESS`. Register with `RUN_TEST()` in `main()`.
+
+- [X] T195 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: All four creation entry points have NULL-pointer negative tests. No crashes on invalid input.
+
+---
+
+### Phase 39 Dependencies
+
+```text
+T191, T192, T193, T194 — parallel [P] (different files, no inter-dependencies)
+T195 — depends on T191, T192, T193, T194
+
+Total: 5 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

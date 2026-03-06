@@ -201,6 +201,33 @@ static int test_session_destroy_null(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* NULL pointer argument tests                                         */
+/* ------------------------------------------------------------------ */
+
+static int test_create_session_null_args(void)
+{
+    VkMLSessionCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .graph = (VkMLGraphKHR)(uintptr_t)0x1,
+        .scratchMemory = VK_NULL_HANDLE,
+        .scratchMemoryOffset = 0,
+        .scratchMemorySize = 0,
+    };
+
+    VkMLSessionKHR session = VK_NULL_HANDLE;
+    VkResult r1 = vkCreateMLSessionKHR(VK_NULL_HANDLE, NULL, NULL, &session);
+    if (r1 == VK_SUCCESS)
+        return 1;
+
+    VkResult r2 = vkCreateMLSessionKHR(VK_NULL_HANDLE, &ci, NULL, NULL);
+    if (r2 == VK_SUCCESS)
+        return 1;
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -210,6 +237,7 @@ int main(void)
     RUN_TEST(test_session_auto_allocation);
     RUN_TEST(test_session_destroy);
     RUN_TEST(test_session_destroy_null);
+    RUN_TEST(test_create_session_null_args);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);

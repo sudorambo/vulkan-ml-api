@@ -1992,6 +1992,38 @@ static int test_graph_node_name_deep_copy(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* NULL pointer argument tests                                         */
+/* ------------------------------------------------------------------ */
+
+static int test_create_graph_null_args(void)
+{
+    VkMLGraphCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_GRAPH_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .nodeCount = 0,
+        .pNodes = NULL,
+        .externalInputCount = 0,
+        .pExternalInputDescriptions = NULL,
+        .externalOutputCount = 0,
+        .pExternalOutputDescriptions = NULL,
+        .constantWeightCount = 0,
+        .pConstantWeightDescriptions = NULL,
+    };
+
+    VkMLGraphKHR graph = VK_NULL_HANDLE;
+    VkResult r1 = vkCreateMLGraphKHR(VK_NULL_HANDLE, NULL, NULL, &graph);
+    if (r1 == VK_SUCCESS)
+        return 1;
+
+    VkResult r2 = vkCreateMLGraphKHR(VK_NULL_HANDLE, &ci, NULL, NULL);
+    if (r2 == VK_SUCCESS)
+        return 1;
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -2025,6 +2057,7 @@ int main(void)
     RUN_TEST(test_graph_node_deep_copy);
     RUN_TEST(test_graph_node_null_desc_ops);
     RUN_TEST(test_graph_node_name_deep_copy);
+    RUN_TEST(test_create_graph_null_args);
 
     if (g_fail_count > 0) {
         printf("\n%d test(s) FAILED\n", g_fail_count);
