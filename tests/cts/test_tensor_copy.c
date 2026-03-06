@@ -7,6 +7,7 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
+#include "../../src/internal.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -79,7 +80,13 @@ static int test_copy_basic(void)
 
     VkCommandBuffer cmd = (VkCommandBuffer)(uintptr_t)0xBEEF;
     vkCmdCopyTensorKHR(cmd, &copyInfo);
-    /* No crash = pass */
+
+    VkTensorKHR_T *st = (VkTensorKHR_T *)(uintptr_t)src;
+    VkTensorKHR_T *dt = (VkTensorKHR_T *)(uintptr_t)dst;
+    if (st->description.dimensionCount != 4)
+        return 1;
+    if (dt->description.dimensionCount != 4)
+        return 1;
 
     vkDestroyTensorKHR(VK_NULL_HANDLE, dst, NULL);
     vkDestroyTensorKHR(VK_NULL_HANDLE, src, NULL);
@@ -140,7 +147,19 @@ static int test_copy_null_cmd(void)
     };
 
     vkCmdCopyTensorKHR(VK_NULL_HANDLE, &copyInfo);
-    /* Should handle gracefully (no crash) */
+
+    VkTensorKHR_T *st = (VkTensorKHR_T *)(uintptr_t)src;
+    VkTensorKHR_T *dt = (VkTensorKHR_T *)(uintptr_t)dst;
+    if (st->description.dimensionCount != 4)
+        return 1;
+    if (dt->description.dimensionCount != 4)
+        return 1;
+
+    VkCommandBuffer cmd2 = (VkCommandBuffer)(uintptr_t)0xBEEF;
+    vkCmdCopyTensorKHR(cmd2, NULL);
+
+    if (st->description.dimensionCount != 4)
+        return 1;
 
     vkDestroyTensorKHR(VK_NULL_HANDLE, dst, NULL);
     vkDestroyTensorKHR(VK_NULL_HANDLE, src, NULL);

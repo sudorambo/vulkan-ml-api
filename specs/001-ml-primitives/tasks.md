@@ -843,6 +843,93 @@ Total: 3 tasks. Sequential.
 
 ---
 
+## Phase 20: Review Remediation — H9 (Strengthen Tautological Tests)
+
+**Goal**: Replace or strengthen 7 tautological tests that always pass regardless of implementation correctness. Each test must now exercise real API behavior or validation logic. Resolves HIGH finding H9 from `review-findings.md`.
+
+### Sub-phase 20a: Strengthen null-handle destroy tests
+
+- [X] T128 [P] In `tests/cts/test_tensor_lifecycle.c`, replace the body of `test_destroy_null_handle` (line 177-181). Instead of unconditional `return 0`:
+  1. Create a valid tensor (`vkCreateTensorKHR`) and store the handle.
+  2. Call `vkDestroyTensorKHR(VK_NULL_HANDLE, VK_NULL_HANDLE, NULL)` — the null-handle destroy.
+  3. Verify the live tensor is still valid: cast to `VkTensorKHR_T*` and assert `description.dimensionCount` still holds its expected value.
+  4. Destroy the live tensor normally — assert it doesn't crash.
+  5. Return 0 only if all assertions pass, 1 otherwise.
+
+- [X] T129 [P] In `tests/cts/test_tensor_view.c`, replace the body of `test_destroy_view_null` (line 118-122). Instead of unconditional `return 0`:
+  1. Create a valid tensor and a valid tensor view.
+  2. Call `vkDestroyTensorViewKHR(VK_NULL_HANDLE, VK_NULL_HANDLE, NULL)` — the null-handle destroy.
+  3. Verify the live view is still valid: cast to `VkTensorViewKHR_T*` and assert `format` still holds its expected value.
+  4. Destroy the view and tensor normally.
+  5. Return 0 only if all assertions pass, 1 otherwise.
+  6. Add `#include "../../src/internal.h"` at the top if not already present (needed for `VkTensorViewKHR_T`).
+
+### Sub-phase 20b: Strengthen tensor copy tests
+
+- [X] T130 [P] In `tests/cts/test_tensor_copy.c`, strengthen both copy tests:
+
+  **`test_copy_basic` (line 26)**: After the `vkCmdCopyTensorKHR` call, add assertions:
+  1. Verify `src` tensor is still valid (cast to `VkTensorKHR_T*`, check `description.dimensionCount == 4`).
+  2. Verify `dst` tensor is still valid (same check).
+  3. Return 0 only if both assertions pass.
+
+  **`test_copy_null_cmd` (line 89)**: Add assertions:
+  1. After the copy call with `VK_NULL_HANDLE` command buffer, verify both tensors are still valid (same internal state check).
+  2. Also add a test for `pCopyInfo = NULL`: call `vkCmdCopyTensorKHR(cmd, NULL)` and verify the tensors remain valid.
+  3. Return 0 only if all assertions pass.
+
+  Add `#include "../../src/internal.h"` at the top if not already present (needed for `VkTensorKHR_T`).
+
+### Sub-phase 20c: Replace struct-readback tests with validation tests
+
+- [X] T131 In `tests/cts/test_synchronization.c`, replace the bodies of three tautological tests with validation-layer calls. The file already includes `../../layers/validation/vk_ml_validation.h` (from prior work). Replace as follows:
+
+  **`test_barrier_structure` (line 30)**: Replace C struct readback with:
+  1. Create a valid tensor via `vkCreateTensorKHR`.
+  2. Build a valid `VkTensorMemoryBarrierKHR` with the tensor handle and valid access masks (`VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR` src, `VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR` dst), both queue families `VK_QUEUE_FAMILY_IGNORED`.
+  3. Call `vk_ml_validate_tensor_memory_barrier(&barrier)` and assert it returns `VK_TRUE`.
+  4. Set `barrier.tensor = VK_NULL_HANDLE` and assert validation returns `VK_FALSE`.
+  5. Destroy the tensor. Return 0 if all pass.
+
+  **`test_dependency_info` (line 62)**: Replace C struct readback with:
+  1. Create a valid tensor.
+  2. Build a valid barrier and dependency info (`tensorMemoryBarrierCount = 1`, `pTensorMemoryBarriers = &barrier`).
+  3. Assert `vk_ml_validate_tensor_dependency_info(&depInfo)` returns `VK_TRUE`.
+  4. Set `depInfo.tensorMemoryBarrierCount = 0` and assert validation returns `VK_FALSE`.
+  5. Restore count, set `depInfo.pTensorMemoryBarriers = NULL` and assert validation returns `VK_FALSE`.
+  6. Destroy the tensor. Return 0 if all pass.
+
+  **`test_queue_family_transfer` (line 268)**: Replace C struct readback with:
+  1. Create a valid tensor.
+  2. Build a barrier with `srcQueueFamilyIndex = 0`, `dstQueueFamilyIndex = 1` (both explicit — valid symmetric transfer).
+  3. Assert `vk_ml_validate_tensor_memory_barrier(&barrier)` returns `VK_TRUE`.
+  4. Set `srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED` (asymmetric — one IGNORED, one not).
+  5. Assert validation returns `VK_FALSE`.
+  6. Set both to `VK_QUEUE_FAMILY_IGNORED` (symmetric — valid).
+  7. Assert validation returns `VK_TRUE`.
+  8. Destroy the tensor. Return 0 if all pass.
+
+### Sub-phase 20d: Build + test verification
+
+- [X] T132 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass. Verify no test is tautological: each modified test has at least one real assertion that could fail if the implementation were broken.
+
+**Checkpoint**: All 7 tautological tests now exercise real API behavior or validation logic. No test unconditionally returns 0.
+
+---
+
+### Phase 20 Dependencies
+
+```text
+Sub-phase 20a (destroy):  T128, T129 — [P] (different files)
+Sub-phase 20b (copy):     T130 — [P] (different file)
+Sub-phase 20c (sync):     T131 — separate file
+Sub-phase 20d (verify):   T132 — depends on T128-T131
+
+Total: 5 tasks. T128-T130 parallelizable, T131 sequential, T132 final.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

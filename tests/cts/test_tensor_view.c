@@ -7,6 +7,7 @@
  */
 
 #include <vulkan/vulkan_ml_primitives.h>
+#include "../../src/internal.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -117,8 +118,57 @@ static int test_create_view_subregion(void)
 
 static int test_destroy_view_null(void)
 {
+    uint32_t dims[] = {4, 8};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR tci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    if (vkCreateTensorKHR(VK_NULL_HANDLE, &tci, NULL, &tensor) != VK_SUCCESS)
+        return 1;
+
+    uint32_t offsets[] = {0, 0};
+    uint32_t sizes[] = {2, 4};
+    VkTensorViewCreateInfoKHR vci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .tensor = tensor,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensionOffsets = offsets,
+        .pDimensionSizes = sizes,
+    };
+    VkTensorViewKHR view = VK_NULL_HANDLE;
+    if (vkCreateTensorViewKHR(VK_NULL_HANDLE, &vci, NULL, &view) != VK_SUCCESS) {
+        vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+        return 1;
+    }
+
     vkDestroyTensorViewKHR(VK_NULL_HANDLE, VK_NULL_HANDLE, NULL);
-    return 0; /* No crash = pass */
+
+    VkTensorViewKHR_T *v = (VkTensorViewKHR_T *)(uintptr_t)view;
+    if (v->format != VK_FORMAT_R32_SFLOAT)
+        return 1;
+
+    vkDestroyTensorViewKHR(VK_NULL_HANDLE, view, NULL);
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
+    return 0;
 }
 
 static int test_view_format_reinterpret(void)

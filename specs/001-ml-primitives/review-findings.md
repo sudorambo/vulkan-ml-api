@@ -114,12 +114,13 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H9 — Tautological tests that can never fail
 
-- [ ] **Files**: `test_tensor_lifecycle.c:176`, `test_tensor_view.c:118`, `test_tensor_copy.c:26,89`, `test_synchronization.c:30,62,268`
+- [x] **Files**: `test_tensor_lifecycle.c`, `test_tensor_view.c`, `test_tensor_copy.c`, `test_synchronization.c`
 - **Description**: Several tests always pass regardless of implementation correctness:
   - `test_destroy_null_handle` / `test_destroy_view_null` — return 0 unconditionally
   - `test_copy_basic` / `test_copy_null_cmd` — "no crash = pass", no assertions
   - `test_barrier_structure` / `test_dependency_info` / `test_queue_family_transfer` — verify C struct initialization reads back correctly (compiler-guaranteed)
 - **Fix**: Add meaningful assertions: verify destroy doesn't crash by checking it doesn't corrupt adjacent state, verify copy records the operation (if possible), replace struct-initialization tests with validation-layer or API-level tests.
+- **FIXED**: Phase 20 (T128-T132). All 7 tests now have real assertions: null-handle destroy tests verify a live adjacent object survives; copy tests verify tensor internal state is preserved; struct-readback tests replaced with `vk_ml_validate_tensor_memory_barrier` / `vk_ml_validate_tensor_dependency_info` calls testing valid/invalid configurations.
 
 ### H10 — CTS tests depend on internal representation
 

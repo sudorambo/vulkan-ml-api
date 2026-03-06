@@ -176,8 +176,38 @@ static int test_bind_memory(void)
 
 static int test_destroy_null_handle(void)
 {
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR live = VK_NULL_HANDLE;
+    if (vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, &live) != VK_SUCCESS)
+        return 1;
+
     vkDestroyTensorKHR(VK_NULL_HANDLE, VK_NULL_HANDLE, NULL);
-    return 0; /* No crash = pass */
+
+    VkTensorKHR_T *t = (VkTensorKHR_T *)(uintptr_t)live;
+    if (t->description.dimensionCount != 2)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, live, NULL);
+    return 0;
 }
 
 static int test_create_multiple_formats(void)

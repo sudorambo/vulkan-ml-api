@@ -29,29 +29,48 @@ static int g_fail_count = 0;
 
 static int test_barrier_structure(void)
 {
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    if (vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, &tensor) != VK_SUCCESS)
+        return 1;
+
     VkTensorMemoryBarrierKHR barrier = {
         .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
         .pNext = NULL,
-        .srcAccessMask = 0,
-        .dstAccessMask = 0,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .tensor = VK_NULL_HANDLE,
+        .tensor = tensor,
     };
 
-    if (barrier.sType != (VkStructureType)1000559005)
-        return 1;
-    if (barrier.pNext != NULL)
-        return 1;
-    if (barrier.srcAccessMask != 0 || barrier.dstAccessMask != 0)
-        return 1;
-    if (barrier.srcQueueFamilyIndex != VK_QUEUE_FAMILY_IGNORED)
-        return 1;
-    if (barrier.dstQueueFamilyIndex != VK_QUEUE_FAMILY_IGNORED)
-        return 1;
-    if (barrier.tensor != VK_NULL_HANDLE)
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_TRUE)
         return 1;
 
+    barrier.tensor = VK_NULL_HANDLE;
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_FALSE)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
     return 0;
 }
 
@@ -61,14 +80,38 @@ static int test_barrier_structure(void)
 
 static int test_dependency_info(void)
 {
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    if (vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, &tensor) != VK_SUCCESS)
+        return 1;
+
     VkTensorMemoryBarrierKHR barrier = {
         .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
         .pNext = NULL,
-        .srcAccessMask = 0,
-        .dstAccessMask = 0,
+        .srcAccessMask = VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_ML_GRAPH_WRITE_BIT_KHR,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .tensor = VK_NULL_HANDLE,
+        .tensor = tensor,
     };
 
     VkTensorDependencyInfoKHR depInfo = {
@@ -78,17 +121,19 @@ static int test_dependency_info(void)
         .pTensorMemoryBarriers = &barrier,
     };
 
-    if (depInfo.sType != (VkStructureType)1000559022)
-        return 1;
-    if (depInfo.pNext != NULL)
-        return 1;
-    if (depInfo.tensorMemoryBarrierCount != 1)
-        return 1;
-    if (depInfo.pTensorMemoryBarriers != &barrier)
-        return 1;
-    if (depInfo.pTensorMemoryBarriers->sType != (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR)
+    if (vk_ml_validate_tensor_dependency_info(&depInfo) != VK_TRUE)
         return 1;
 
+    depInfo.tensorMemoryBarrierCount = 0;
+    if (vk_ml_validate_tensor_dependency_info(&depInfo) != VK_FALSE)
+        return 1;
+
+    depInfo.tensorMemoryBarrierCount = 1;
+    depInfo.pTensorMemoryBarriers = NULL;
+    if (vk_ml_validate_tensor_dependency_info(&depInfo) != VK_FALSE)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
     return 0;
 }
 
@@ -267,6 +312,30 @@ static int test_dependency_info_validation(void)
 
 static int test_queue_family_transfer(void)
 {
+    uint32_t dims[] = {2, 3};
+    VkTensorDescriptionKHR desc = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR,
+        .pNext = NULL,
+        .tiling = VK_TENSOR_TILING_OPTIMAL_KHR,
+        .format = VK_FORMAT_R32_SFLOAT,
+        .dimensionCount = 2,
+        .pDimensions = dims,
+        .pStrides = NULL,
+        .usage = VK_TENSOR_USAGE_ML_GRAPH_INPUT_BIT_KHR,
+    };
+    VkTensorCreateInfoKHR ci = {
+        .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .pDescription = &desc,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+    };
+    VkTensorKHR tensor = VK_NULL_HANDLE;
+    if (vkCreateTensorKHR(VK_NULL_HANDLE, &ci, NULL, &tensor) != VK_SUCCESS)
+        return 1;
+
     VkTensorMemoryBarrierKHR barrier = {
         .sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_MEMORY_BARRIER_KHR,
         .pNext = NULL,
@@ -274,14 +343,22 @@ static int test_queue_family_transfer(void)
         .dstAccessMask = VK_ACCESS_2_ML_GRAPH_READ_BIT_KHR,
         .srcQueueFamilyIndex = 0,
         .dstQueueFamilyIndex = 1,
-        .tensor = VK_NULL_HANDLE,
+        .tensor = tensor,
     };
 
-    if (barrier.srcQueueFamilyIndex != 0)
-        return 1;
-    if (barrier.dstQueueFamilyIndex != 1)
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_TRUE)
         return 1;
 
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_FALSE)
+        return 1;
+
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    if (vk_ml_validate_tensor_memory_barrier(&barrier) != VK_TRUE)
+        return 1;
+
+    vkDestroyTensorKHR(VK_NULL_HANDLE, tensor, NULL);
     return 0;
 }
 
