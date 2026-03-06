@@ -1744,7 +1744,8 @@ Total: 4 tasks.
 - [x] T224 [P] In `layers/validation/graph_validation.c`, change `#include "../../src/internal.h"` (line 7) to `#include "internal.h"`. Same rationale as T223.
 
 - [x] T225 In `CMakeLists.txt`, in the CTS test `foreach` loop (around line 98), add `${CMAKE_CURRENT_SOURCE_DIR}/layers/validation` to the `target_include_directories` block so that CTS tests can include `vk_ml_validation.h` directly. The block should become:
-  ```
+
+  ```c
   target_include_directories(${test_name} PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/src
       ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation
@@ -1756,7 +1757,8 @@ Total: 4 tasks.
 - [x] T227 [P] In `tests/cts/test_ml_dispatch.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 7) to `#include "vk_ml_validation.h"` (now resolvable via CMake after T225).
 
 - [x] T228 [P] In `src/internal.h`, add the missing `VUID_SESSION_SCRATCH_OFFSET_ALIGN` string constant define. Insert it after the `VUID_SESSION_GRAPH_VALID` define (around line 245), before `VUID_DISPATCH_CMD_STATE`:
-  ```
+
+  ```c
   #define VUID_SESSION_SCRATCH_OFFSET_ALIGN \
       "VUID-VkMLSessionCreateInfoKHR-scratchMemoryOffset-00004"
   ```
@@ -1798,7 +1800,8 @@ Total: 9 tasks.
 - [x] T233 [P] In `layers/validation/vk_ml_validation.h`, remove `#include <stdbool.h>` (line 12). The validation layer exclusively uses `VkBool32`; the `bool` type from `<stdbool.h>` is never referenced in any validation source or header file.
 
 - [x] T234 In `CMakeLists.txt`, move the quickstart example build out of the `if(BUILD_TESTING)` block (currently at lines 130–137). Add a separate guard:
-  ```
+
+  ```c
   option(BUILD_EXAMPLES "Build example programs" ON)
   if(BUILD_EXAMPLES)
       add_executable(quickstart examples/quickstart.c)
@@ -1806,11 +1809,13 @@ Total: 9 tasks.
       target_link_libraries(quickstart PRIVATE vk_ml_primitives)
   endif()
   ```
+
   Place this new block after `endif() # BUILD_TESTING` and before the static analysis section. The quickstart only links `vk_ml_primitives`, not the validation library, so it is independent of the test infrastructure.
 
 - [x] T235 [P] In `layers/validation/tensor_validation.c`, replace the hardcoded magic number `const VkFlags validUsageMask = 0x7F;` (line 70) with `const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;`. This derives the mask from the highest defined enum bit, making it self-updating if new usage flags are added. The result is identical today (`0x40 << 1 - 1 = 0x7F`).
 
 - [x] T236 In `src/ml_graph.c`, add a new static helper `deep_copy_tensor_desc_into` immediately after the existing `deep_copy_tensor_desc` function (after line 56). The function copies tensor description fields directly into a caller-provided destination, eliminating the temporary shell allocation:
+
   ```c
   static VkResult deep_copy_tensor_desc_into(
       VkTensorDescriptionKHR *dst,
@@ -1844,20 +1849,25 @@ Total: 9 tasks.
       return VK_SUCCESS;
   }
   ```
+
   The existing `deep_copy_tensor_desc()` is kept for the node binding use case at line 143.
 
 - [x] T237 In `src/ml_graph.c`, replace the three deep-copy loops (external inputs at lines 318–324, external outputs at lines 338–344, constant weights at lines 358–364) to use the new `deep_copy_tensor_desc_into` helper instead of `deep_copy_tensor_desc` + shallow copy + free. Each loop body changes from:
+
   ```c
   VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(...);
   if (!copy) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
   graph->...Descs[i] = *copy;
   vk_ml_free(pAllocator, copy);
   ```
+
   to:
+
   ```c
   result = deep_copy_tensor_desc_into(&graph->...Descs[i], &src[i], pAllocator);
   if (result != VK_SUCCESS) goto cleanup;
   ```
+
   This must be done for all three loops (inputs, outputs, weights). Depends on T236.
 
 - [x] T238 [P] In `tests/validation/test_vuids.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 6) to `#include "vk_ml_validation.h"`. The CMake target already provides `layers/validation/` as a PRIVATE include directory.
@@ -1900,7 +1910,7 @@ Total: 13 tasks.
 
 ---
 
-## Notes
+## Notes (cont.)
 
 - [P] tasks = different files, no dependencies on incomplete tasks
 - [Story] label maps task to specific user story for traceability

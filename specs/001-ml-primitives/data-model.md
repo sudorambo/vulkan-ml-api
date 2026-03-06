@@ -42,6 +42,7 @@ N-dimensional data container for ML workloads.
 Bind Memory → Use (dispatch/copy/shader) → Destroy.
 
 **Validation rules** (VUIDs):
+
 - `tensorObjects` feature MUST be enabled.
 - Device MUST have at least one queue.
 - Memory MUST NOT be bound twice.
@@ -103,6 +104,7 @@ after creation.
 Sessions → Dispatch (N times) → Destroy Sessions → Destroy Graph.
 
 **Validation rules**:
+
 - `mlGraph` feature MUST be enabled.
 - Graph topology MUST be a DAG (no cycles).
 - All internal tensor edges MUST have compatible shapes/formats.

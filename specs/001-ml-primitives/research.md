@@ -25,6 +25,7 @@ graphs require DAG compilation semantics absent from
 specific to graph execution.
 
 **Alternatives considered**:
+
 - *Repurpose VkBuffer with metadata*: Rejected — loses type safety and
   would require extensive `pNext` chains to carry dimension/format info
   on every API call, violating Principle VII (simplicity).
@@ -48,6 +49,7 @@ compiled graph can be shared across command buffers and sessions
 without synchronization.
 
 **Alternatives considered**:
+
 - *JIT compilation at first dispatch*: Rejected — unpredictable first-
   frame latency violates the performance constraint (graph compilation
   is setup-time, not per-frame).
@@ -70,6 +72,7 @@ needed to express ML-specific ordering. Everything else (barriers,
 semaphores, queue submission) reuses existing infrastructure.
 
 **Alternatives considered**:
+
 - *Dedicated ML fence type*: Rejected — timeline semaphores already
   provide cross-queue signaling with monotonic values, covering all
   ML synchronization needs.
@@ -91,6 +94,7 @@ control. The opt-in auto-allocation path serves simpler use cases
 without violating the explicit-by-default model (Principle V).
 
 **Alternatives considered**:
+
 - *Fully driver-managed tensor memory*: Rejected — removes application
   control over memory budget and prevents suballocation strategies,
   violating Principle V.
@@ -112,6 +116,7 @@ debug builds without performance cost in release. Each VUID from the
 spec maps to a discrete check function.
 
 **Alternatives considered**:
+
 - *Inline validation in ICD*: Rejected — couples validation with
   implementation, makes it impossible to disable for release builds,
   and violates the layered architecture pattern.
@@ -131,6 +136,7 @@ tools are widely available and integrate with CMake via
 `CMAKE_EXPORT_COMPILE_COMMANDS`.
 
 **Alternatives considered**:
+
 - *Meson*: Rejected — lower adoption in the Vulkan ecosystem; would
   create friction for contributors familiar with CMake.
 - *Bazel*: Rejected — heavy dependency, uncommon in graphics/Vulkan
@@ -151,6 +157,7 @@ detection, unit tests verify internal algorithms (DAG cycle detection,
 shape inference).
 
 **Alternatives considered**:
+
 - *CTS-only testing*: Rejected — CTS tests correctness but not
   error handling. VUID negative tests are separately required by
   Principle IV.
@@ -173,6 +180,7 @@ tensor type system in SPIR-V mirrors the Vulkan tensor description,
 enabling zero-copy interop.
 
 **Alternatives considered**:
+
 - *Buffer-based shader access only*: Rejected — loses typed access and
   multi-dimensional indexing. Would require manual stride calculations
   in every shader.
