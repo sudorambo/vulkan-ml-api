@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan_ml_primitives.h>
 #include "../../layers/validation/vk_ml_validation.h"
+#include "test_helpers.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -17,62 +18,6 @@ static int g_fail_count = 0;
 } while (0)
 
 #define MOCK_COMMAND_BUFFER ((VkCommandBuffer)(uintptr_t)0xBEEF)
-
-/* ------------------------------------------------------------------ */
-/* Test helpers                                                        */
-/* ------------------------------------------------------------------ */
-
-static void make_tensor_desc(VkTensorDescriptionKHR *desc,
-                             uint32_t *dims,
-                             uint32_t dim_count,
-                             VkFormat format,
-                             VkTensorUsageFlagsKHR usage)
-{
-    desc->sType = (VkStructureType)VK_STRUCTURE_TYPE_TENSOR_DESCRIPTION_KHR;
-    desc->pNext = NULL;
-    desc->tiling = VK_TENSOR_TILING_OPTIMAL_KHR;
-    desc->format = format;
-    desc->dimensionCount = dim_count;
-    desc->pDimensions = dims;
-    desc->pStrides = NULL;
-    desc->usage = usage;
-}
-
-static void make_tensor_binding_external_input(VkMLTensorBindingKHR *b,
-                                               uint32_t tensor_index,
-                                               const VkTensorDescriptionKHR *desc)
-{
-    b->sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR;
-    b->pNext = NULL;
-    b->bindingType = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_INPUT_KHR;
-    b->nodeIndex = 0;
-    b->tensorIndex = tensor_index;
-    b->pTensorDescription = desc;
-}
-
-static void make_tensor_binding_external_output(VkMLTensorBindingKHR *b,
-                                                uint32_t tensor_index,
-                                                const VkTensorDescriptionKHR *desc)
-{
-    b->sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR;
-    b->pNext = NULL;
-    b->bindingType = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_OUTPUT_KHR;
-    b->nodeIndex = 0;
-    b->tensorIndex = tensor_index;
-    b->pTensorDescription = desc;
-}
-
-static void make_tensor_binding_external_weight(VkMLTensorBindingKHR *b,
-                                                uint32_t tensor_index,
-                                                const VkTensorDescriptionKHR *desc)
-{
-    b->sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR;
-    b->pNext = NULL;
-    b->bindingType = VK_ML_TENSOR_BINDING_TYPE_EXTERNAL_WEIGHT_KHR;
-    b->nodeIndex = 0;
-    b->tensorIndex = tensor_index;
-    b->pTensorDescription = desc;
-}
 
 static VkTensorKHR create_tensor(const VkTensorDescriptionKHR *desc)
 {

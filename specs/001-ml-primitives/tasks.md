@@ -1414,6 +1414,42 @@ Total: 2 tasks.
 
 ---
 
+## Phase 37: Review Remediation — M17 (Test helper code duplication)
+
+**Goal**: Extract duplicated test helpers (`make_tensor_desc`, `make_tensor_binding_external_input/output/weight`, `make_tensor_binding_internal`) into a shared `tests/cts/test_helpers.h` header. Remove duplicates from 3 test files. No logic changes. Resolves MEDIUM finding M17 from `review-findings.md`.
+
+### Sub-phase 37a: Create shared header
+
+- [X] T182 Create `tests/cts/test_helpers.h` with include guard, `#include <vulkan/vulkan_ml_primitives.h>`, and all 5 helper functions as `static inline`: `make_tensor_desc`, `make_tensor_binding_external_input`, `make_tensor_binding_external_output`, `make_tensor_binding_external_weight`, `make_tensor_binding_internal`.
+
+### Sub-phase 37b: Remove duplicates from test files (parallelizable, depends on T182)
+
+- [X] T183 [P] In `tests/cts/test_ml_graph.c`, replace the 4 duplicated helper functions (`make_tensor_desc`, `make_tensor_binding_external_input`, `make_tensor_binding_external_output`, `make_tensor_binding_internal`) with `#include "test_helpers.h"`.
+
+- [X] T184 [P] In `tests/cts/test_ml_session.c`, replace the 3 duplicated helper functions (`make_tensor_desc`, `make_tensor_binding_external_input`, `make_tensor_binding_external_output`) with `#include "test_helpers.h"`.
+
+- [X] T185 [P] In `tests/cts/test_ml_dispatch.c`, replace the 4 duplicated helper functions (`make_tensor_desc`, `make_tensor_binding_external_input`, `make_tensor_binding_external_output`, `make_tensor_binding_external_weight`) with `#include "test_helpers.h"`.
+
+### Sub-phase 37c: Build + test verification
+
+- [X] T186 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Test helper duplication eliminated. All 13 tests pass.
+
+---
+
+### Phase 37 Dependencies
+
+```text
+Sub-phase 37a (header):  T182 — sequential
+Sub-phase 37b (cleanup): T183, T184, T185 — [P] (different files, depends on T182)
+Sub-phase 37c (verify):  T186 — depends on T183-T185
+
+Total: 5 tasks. T183-T185 parallelizable.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

@@ -252,9 +252,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M17 — Test helper code duplication
 
-- [ ] [P] **Files**: `tests/cts/test_ml_graph.c`, `tests/cts/test_ml_session.c`, `tests/cts/test_ml_dispatch.c`
+- [x] [P] **Files**: `tests/cts/test_ml_graph.c`, `tests/cts/test_ml_session.c`, `tests/cts/test_ml_dispatch.c`
 - **Description**: `make_tensor_desc`, `make_tensor_binding_external_input/output/weight` are copy-pasted identically across 3 files.
 - **Fix**: Extract into a shared `tests/cts/test_helpers.h` and include from each file.
+- **FIXED**: Phase 37 (T182-T186). Created `tests/cts/test_helpers.h` with all 5 helpers as `static inline`. Removed duplicates from 3 test files, added `#include "test_helpers.h"`. All 13 tests pass.
 
 ### M18 — Missing test coverage for concurrent mode and linear tiling
 
