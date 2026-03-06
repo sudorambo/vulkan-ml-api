@@ -64,6 +64,13 @@ VkBool32 vk_ml_validate_tensor_create(
         }
     }
 
+    /* VUID_TENSOR_USAGE */
+    if (desc->usage == 0)
+        return VK_FALSE;
+    const VkFlags validUsageMask = 0x7F;
+    if (desc->usage & ~validUsageMask)
+        return VK_FALSE;
+
     return VK_TRUE;
 }
 

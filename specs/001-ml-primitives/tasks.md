@@ -1292,6 +1292,29 @@ Total: 2 tasks.
 
 ---
 
+## Phase 32: Review Remediation — M12 (Tensor usage flags never validated)
+
+**Goal**: Reject zero usage flags and undefined usage bits in `vk_ml_validate_tensor_create`. Validation-layer-only change. Resolves MEDIUM finding M12 from `review-findings.md`.
+
+- [X] T170 In `layers/validation/tensor_validation.c`, inside `vk_ml_validate_tensor_create`, after the stride alignment check (line 65) and before `return VK_TRUE` (line 67), add: (1) `/* VUID_TENSOR_USAGE */ if (desc->usage == 0) return VK_FALSE;` to reject zero usage, and (2) `const VkFlags validUsageMask = 0x7F; if (desc->usage & ~validUsageMask) return VK_FALSE;` to reject undefined bits (bits 0-6 are the 7 defined `VK_TENSOR_USAGE_*_BIT_KHR` values).
+
+- [X] T171 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Tensor creation validation now rejects zero and invalid usage flags. All 13 tests pass.
+
+---
+
+### Phase 32 Dependencies
+
+```text
+T170 — sequential (single file)
+T171 — depends on T170
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

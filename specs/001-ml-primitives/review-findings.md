@@ -212,9 +212,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M12 — Tensor usage flags never validated
 
-- [ ] **File**: `layers/validation/tensor_validation.c:11-63`
+- [x] **File**: `layers/validation/tensor_validation.c:66-71`
 - **Description**: `vk_ml_validate_tensor_create` never checks `desc->usage`. Zero usage flags or invalid combinations are silently accepted.
 - **Fix**: Add `if (desc->usage == 0) return VK_FALSE;` and optionally validate that only defined bits are set.
+- **FIXED**: Phase 32 (T170). Added `/* VUID_TENSOR_USAGE */` block: rejects `usage == 0` and rejects undefined bits via `desc->usage & ~0x7F` mask (7 defined `VK_TENSOR_USAGE_*_BIT_KHR` values). All 13 tests pass.
 
 ### M13 — Tensor view doesn't check tensor has memory bound
 
