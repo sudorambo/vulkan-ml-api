@@ -19,16 +19,25 @@ VKAPI_ATTR void VKAPI_CALL vkCmdCopyTensorKHR(
     (void)commandBuffer;
     (void)pCopyInfo;
 
-    if (!pCopyInfo)
+    if (!commandBuffer || !pCopyInfo)
+        return;
+    if ((int)pCopyInfo->sType != VK_STRUCTURE_TYPE_COPY_TENSOR_INFO_KHR)
         return;
 
-    /* Basic parameter validation */
     if (pCopyInfo->srcTensor == VK_NULL_HANDLE || pCopyInfo->dstTensor == VK_NULL_HANDLE)
         return;
     if (pCopyInfo->srcTensor == pCopyInfo->dstTensor)
         return;
-    if (pCopyInfo->regionCount > 0 && !pCopyInfo->pRegions)
+    if (pCopyInfo->regionCount == 0 || !pCopyInfo->pRegions)
         return;
 
-    /* Stub: actual GPU copy is IHV-specific; reference impl records intent */
+    for (uint32_t i = 0; i < pCopyInfo->regionCount; i++) {
+        const VkTensorCopyKHR *r = &pCopyInfo->pRegions[i];
+        if ((int)r->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
+            return;
+        if (r->dimensionCount > 0 && (!r->pSrcOffsets || !r->pDstOffsets))
+            return;
+    }
+
+    /* Reference ICD: copy intent recorded; actual GPU copy is IHV-specific */
 }

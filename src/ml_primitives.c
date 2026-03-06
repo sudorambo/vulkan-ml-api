@@ -86,12 +86,46 @@ VkBool32 vk_ml_validate_primitive_desc(VkMLOperationTypeKHR opType, const void *
             return VK_FALSE;
         break;
     }
-    case VK_ML_OPERATION_TYPE_CONCAT_KHR:
-    case VK_ML_OPERATION_TYPE_RESHAPE_KHR:
-    case VK_ML_OPERATION_TYPE_TRANSPOSE_KHR:
-    case VK_ML_OPERATION_TYPE_RESIZE_KHR:
-        /* No descriptor or minimal validation */
+    case VK_ML_OPERATION_TYPE_CONCAT_KHR: {
+        const VkMLPrimitiveDescConcatKHR *d =
+            (const VkMLPrimitiveDescConcatKHR *)pDesc;
+        if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR)
+            return VK_FALSE;
         break;
+    }
+    case VK_ML_OPERATION_TYPE_RESHAPE_KHR: {
+        const VkMLPrimitiveDescReshapeKHR *d =
+            (const VkMLPrimitiveDescReshapeKHR *)pDesc;
+        if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR)
+            return VK_FALSE;
+        if (d->dimensionCount == 0 || !d->pOutputDimensions)
+            return VK_FALSE;
+        for (uint32_t i = 0; i < d->dimensionCount; i++) {
+            if (d->pOutputDimensions[i] == 0)
+                return VK_FALSE;
+        }
+        break;
+    }
+    case VK_ML_OPERATION_TYPE_TRANSPOSE_KHR: {
+        const VkMLPrimitiveDescTransposeKHR *d =
+            (const VkMLPrimitiveDescTransposeKHR *)pDesc;
+        if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR)
+            return VK_FALSE;
+        if (d->dimensionCount == 0 || !d->pPermutation)
+            return VK_FALSE;
+        break;
+    }
+    case VK_ML_OPERATION_TYPE_RESIZE_KHR: {
+        const VkMLPrimitiveDescResizeKHR *d =
+            (const VkMLPrimitiveDescResizeKHR *)pDesc;
+        if ((int)d->sType != VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR)
+            return VK_FALSE;
+        if (d->scaleHeight <= 0.0f || d->scaleWidth <= 0.0f)
+            return VK_FALSE;
+        if (!is_finite_float(d->scaleHeight) || !is_finite_float(d->scaleWidth))
+            return VK_FALSE;
+        break;
+    }
     default:
         return VK_FALSE;
     }

@@ -143,10 +143,20 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
 /* VUID string constants                                               */
 /* ------------------------------------------------------------------ */
 
+#define VUID_FEATURES_STYPE         \
+    "VUID-VkPhysicalDeviceMLFeaturesKHR-sType-sType"
+#define VUID_PROPERTIES_STYPE       \
+    "VUID-VkPhysicalDeviceMLPropertiesKHR-sType-sType"
 #define VUID_TENSOR_OBJECTS_FEATURE  \
     "VUID-vkCreateTensorKHR-tensorObjects-00001"
 #define VUID_TENSOR_DEVICE_QUEUE    \
     "VUID-vkCreateTensorKHR-device-00002"
+#define VUID_TENSOR_CREATE_SHARING_MODE \
+    "VUID-VkTensorCreateInfoKHR-sharingMode-00001"
+#define VUID_TENSOR_CREATE_SHARING_INDICES \
+    "VUID-VkTensorCreateInfoKHR-sharingMode-00002"
+#define VUID_TENSOR_CREATE_DESC     \
+    "VUID-VkTensorCreateInfoKHR-pDescription-00003"
 #define VUID_TENSOR_DESC_DIM_COUNT  \
     "VUID-VkTensorDescriptionKHR-dimensionCount-00001"
 #define VUID_TENSOR_DESC_DIM_VALUES \
@@ -167,6 +177,22 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
     "VUID-VkBindTensorMemoryInfoKHR-memory-00003"
 #define VUID_BIND_TENSOR_MEM_SIZE   \
     "VUID-VkBindTensorMemoryInfoKHR-size-00004"
+#define VUID_DESTROY_TENSOR_IN_USE  \
+    "VUID-vkDestroyTensorKHR-tensor-00001"
+#define VUID_DESTROY_TENSOR_VALID   \
+    "VUID-vkDestroyTensorKHR-tensor-00002"
+#define VUID_DESTROY_GRAPH_IN_USE   \
+    "VUID-vkDestroyMLGraphKHR-graph-00001"
+#define VUID_DESTROY_GRAPH_VALID    \
+    "VUID-vkDestroyMLGraphKHR-graph-00002"
+#define VUID_DESTROY_SESSION_IN_USE \
+    "VUID-vkDestroyMLSessionKHR-session-00001"
+#define VUID_COPY_TENSOR_REGION_COUNT \
+    "VUID-VkCopyTensorInfoKHR-regionCount-00001"
+#define VUID_COPY_TENSOR_SRC_OFFSETS \
+    "VUID-VkTensorCopyKHR-pSrcOffsets-00001"
+#define VUID_COPY_TENSOR_DST_OFFSETS \
+    "VUID-VkTensorCopyKHR-pDstOffsets-00002"
 #define VUID_COPY_TENSOR_CMD_STATE  \
     "VUID-vkCmdCopyTensorKHR-commandBuffer-00001"
 #define VUID_COPY_TENSOR_SRC_USAGE  \
@@ -179,8 +205,14 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
     "VUID-vkCmdCopyTensorKHR-format-00005"
 #define VUID_COPY_TENSOR_SAME       \
     "VUID-vkCmdCopyTensorKHR-srcTensor-00006"
+#define VUID_TENSOR_VIEW_OBJECTS_FEATURE \
+    "VUID-vkCreateTensorViewKHR-tensorObjects-00001"
+#define VUID_TENSOR_VIEW_TENSOR_HANDLE \
+    "VUID-vkCreateTensorViewKHR-tensor-00002"
 #define VUID_TENSOR_VIEW_STYPE      \
     "VUID-VkTensorViewCreateInfoKHR-sType-sType"
+#define VUID_TENSOR_VIEW_MEMORY_BOUND \
+    "VUID-VkTensorViewCreateInfoKHR-tensor-00004"
 #define VUID_TENSOR_VIEW_FORMAT     \
     "VUID-VkTensorViewCreateInfoKHR-format-00001"
 #define VUID_TENSOR_VIEW_RANGE      \
@@ -263,6 +295,20 @@ static inline uint32_t vk_ml_format_element_size(VkFormat format) {
     "VUID-vkCmdDispatchMLGraphKHR-pOutputTensors-00008"
 #define VUID_DISPATCH_WEIGHT_USAGE  \
     "VUID-vkCmdDispatchMLGraphKHR-pWeightTensors-00009"
+#define VUID_DISPATCH_INPUT_MEM_BOUND \
+    "VUID-vkCmdDispatchMLGraphKHR-pInputTensors-00010"
+#define VUID_DISPATCH_OUTPUT_MEM_BOUND \
+    "VUID-vkCmdDispatchMLGraphKHR-pOutputTensors-00011"
+#define VUID_DISPATCH_WEIGHT_MEM_BOUND \
+    "VUID-vkCmdDispatchMLGraphKHR-pWeightTensors-00012"
+#define VUID_DISPATCH_INPUT_SHAPES  \
+    "VUID-vkCmdDispatchMLGraphKHR-shapes-00013"
+#define VUID_DISPATCH_OUTPUT_SHAPES \
+    "VUID-vkCmdDispatchMLGraphKHR-shapes-00014"
+#define VUID_DESCRIPTOR_TENSOR_COUNT \
+    "VUID-VkWriteDescriptorSetTensorKHR-tensorCount-00001"
+#define VUID_DESCRIPTOR_TENSOR_VIEWS \
+    "VUID-VkWriteDescriptorSetTensorKHR-pTensorViews-00002"
 
 #ifdef __cplusplus
 }

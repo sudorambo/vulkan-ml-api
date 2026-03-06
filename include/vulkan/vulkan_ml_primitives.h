@@ -66,6 +66,10 @@ enum {
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ACTIVATION_KHR      = 1000559017,
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_NORMALIZATION_KHR   = 1000559018,
     VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_ELEMENTWISE_KHR     = 1000559019,
+    VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_CONCAT_KHR          = 1000559020,
+    VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESHAPE_KHR         = 1000559021,
+    VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_TRANSPOSE_KHR       = 1000559022,
+    VK_STRUCTURE_TYPE_ML_PRIMITIVE_DESC_RESIZE_KHR          = 1000559023,
     VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR            = 1000559020,
     VK_STRUCTURE_TYPE_ML_TENSOR_BINDING_KHR                 = 1000559021,
     VK_STRUCTURE_TYPE_TENSOR_DEPENDENCY_INFO_KHR            = 1000559022,
@@ -436,6 +440,45 @@ typedef struct VkMLPrimitiveDescElementwiseKHR {
     float                        activationParam0;
     float                        activationParam1;
 } VkMLPrimitiveDescElementwiseKHR;
+
+/** @brief Interpolation mode for spatial resize operations. */
+typedef enum VkMLResizeModeKHR {
+    VK_ML_RESIZE_MODE_NEAREST_KHR  = 0,  /**< Nearest-neighbor interpolation. */
+    VK_ML_RESIZE_MODE_BILINEAR_KHR = 1,  /**< Bilinear interpolation. */
+    VK_ML_RESIZE_MODE_MAX_ENUM_KHR = 0x7FFFFFFF
+} VkMLResizeModeKHR;
+
+/** @brief Descriptor for concatenation along a specified dimension. */
+typedef struct VkMLPrimitiveDescConcatKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    uint32_t           axis;        /**< Dimension index along which to concatenate. */
+} VkMLPrimitiveDescConcatKHR;
+
+/** @brief Descriptor for tensor reshape (reinterpret dimensions without copying data). */
+typedef struct VkMLPrimitiveDescReshapeKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    uint32_t           dimensionCount;      /**< Number of output dimensions. */
+    const uint32_t*    pOutputDimensions;    /**< Desired output shape. */
+} VkMLPrimitiveDescReshapeKHR;
+
+/** @brief Descriptor for dimension transposition. */
+typedef struct VkMLPrimitiveDescTransposeKHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    uint32_t           dimensionCount;   /**< Number of dimensions. */
+    const uint32_t*    pPermutation;     /**< Permutation indices; pPermutation[i] is the source dim for output dim i. */
+} VkMLPrimitiveDescTransposeKHR;
+
+/** @brief Descriptor for spatial resize (upsampling/downsampling). */
+typedef struct VkMLPrimitiveDescResizeKHR {
+    VkStructureType     sType;
+    const void*         pNext;
+    VkMLResizeModeKHR   mode;           /**< Interpolation mode. */
+    float               scaleHeight;    /**< Vertical scale factor; must be > 0. */
+    float               scaleWidth;     /**< Horizontal scale factor; must be > 0. */
+} VkMLPrimitiveDescResizeKHR;
 
 /* ML Graph Structures */
 

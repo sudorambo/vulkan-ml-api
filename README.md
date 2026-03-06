@@ -50,7 +50,7 @@ layers/
     └── barrier_validation.c            Tensor memory barrier validation
 
 tests/
-├── cts/                                Conformance test suites (9 suites)
+├── cts/                                Conformance test suites (10 suites)
 │   ├── test_tensor_lifecycle.c         Tensor create/bind/destroy
 │   ├── test_tensor_view.c             Tensor view creation and access
 │   ├── test_tensor_copy.c             Tensor copy operations
@@ -59,12 +59,14 @@ tests/
 │   ├── test_ml_session.c              Session create/destroy
 │   ├── test_ml_dispatch.c             Graph dispatch execution
 │   ├── test_synchronization.c         Barriers and semaphore interop
-│   └── test_spirv_tensor.c            SPIR-V tensor shader access
+│   ├── test_spirv_tensor.c            SPIR-V tensor shader access
+│   └── test_oom.c                     Allocation failure (OOM) paths
 ├── validation/
 │   └── test_vuids.c                    Negative tests for all VUIDs
 └── unit/
     ├── test_dag_validation.c           DAG cycle detection and shape checks
-    └── test_descriptor_validation.c    Primitive descriptor parameter checks
+    ├── test_descriptor_validation.c    Primitive descriptor parameter checks
+    └── test_validation_coverage.c      Comprehensive validation coverage
 
 examples/
 └── quickstart.c                        Minimal end-to-end API example
@@ -74,7 +76,17 @@ spec/
 
 specs/001-ml-primitives/                Design artifacts (plan, tasks, findings)
 
+cmake/
+├── vk_ml_primitivesConfig.cmake.in     CMake package config template
+└── vk_ml_primitives.pc.in             pkg-config template
+
+docs/
+└── developer-guide.md                  Architecture and extension guide
+
+.github/workflows/ci.yml               GitHub Actions CI pipeline
 CMakeLists.txt                          Root build configuration
+CMakePresets.json                       Build presets (default, release, CI)
+Doxyfile                                Doxygen API docs configuration
 ```
 
 ## Prerequisites
@@ -89,7 +101,14 @@ CMakeLists.txt                          Root build configuration
 ## Building
 
 ```sh
-cmake -B build -S .
+cmake --preset default
+cmake --build build
+```
+
+Or manually:
+
+```sh
+cmake -B build -S . -DBUILD_TESTING=ON
 cmake --build build
 ```
 
@@ -104,7 +123,7 @@ The build produces two static libraries:
 cd build && ctest --output-on-failure
 ```
 
-The test suite includes 13 executables:
+The test suite includes 14 executables:
 
 | Suite | Type | Coverage |
 |-------|------|----------|
@@ -121,6 +140,7 @@ The test suite includes 13 executables:
 | test\_dag\_validation | Unit | DAG cycle detection, topological ordering |
 | test\_oom | CTS | OOM (allocation failure) paths for all create functions |
 | test\_descriptor\_validation | Unit | ML primitive descriptor parameter checks |
+| test\_validation\_coverage | Unit | Tensor view, copy, session, dispatch, graph, boundary, barrier tests |
 
 ## Quick Start
 
@@ -132,6 +152,69 @@ example demonstrating the complete workflow:
 3. Create an execution session with `vkCreateMLSessionKHR`
 4. Dispatch the graph with `vkCmdDispatchMLGraphKHR`
 5. Clean up all resources in reverse order
+
+## Validation Layer
+
+The `vk_ml_validation` library provides development-time parameter validation
+for all ML primitive operations. Every check maps to a Valid Usage ID (VUID)
+from the specification.
+
+### Using the Validation Layer
+
+Link against `vk_ml_validation` in your CMake project:
+
+```cmake
+find_package(vk_ml_primitives REQUIRED)
+target_link_libraries(myapp PRIVATE vk_ml_primitives vk_ml_validation)
+```
+
+Call validation functions before or alongside ICD calls:
+
+```c
+#include "vk_ml_validation.h"
+
+VkBool32 valid = vk_ml_validate_tensor_create(&createInfo, &features, &props);
+if (valid == VK_FALSE) {
+    // Handle validation failure — check parameters against VUIDs
+}
+```
+
+### Coverage
+
+The validation layer provides checks for all 81 VUIDs defined in the spec,
+covering tensor lifecycle, graph creation, session management, dispatch
+operations, copy commands, and memory barriers.
+
+## Installation
+
+```sh
+cmake --install build --prefix /usr/local
+```
+
+Downstream CMake projects:
+
+```cmake
+find_package(vk_ml_primitives REQUIRED)
+target_link_libraries(myapp PRIVATE vk_ml_primitives)
+```
+
+pkg-config:
+
+```sh
+pkg-config --cflags --libs vk_ml_primitives
+```
+
+## API Documentation
+
+Generate API reference documentation with Doxygen:
+
+```sh
+doxygen Doxyfile
+# Output in docs/html/index.html
+```
+
+See [`docs/developer-guide.md`](docs/developer-guide.md) for architecture
+details and how to extend the implementation.
 
 ## Static Analysis
 

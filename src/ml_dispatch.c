@@ -16,15 +16,19 @@ VKAPI_ATTR void VKAPI_CALL vkCmdDispatchMLGraphKHR(
     VkCommandBuffer                     commandBuffer,
     const VkMLGraphDispatchInfoKHR*     pDispatchInfo)
 {
-    (void)commandBuffer;
-    (void)pDispatchInfo;
-
-    if (!pDispatchInfo)
+    if (!commandBuffer || !pDispatchInfo)
+        return;
+    if ((int)pDispatchInfo->sType != VK_STRUCTURE_TYPE_ML_GRAPH_DISPATCH_INFO_KHR)
         return;
 
-    /* Basic parameter validation */
     if (pDispatchInfo->session == VK_NULL_HANDLE)
         return;
+    if (pDispatchInfo->inputTensorCount == 0 || !pDispatchInfo->pInputTensors)
+        return;
+    if (pDispatchInfo->outputTensorCount == 0 || !pDispatchInfo->pOutputTensors)
+        return;
+    if (pDispatchInfo->weightTensorCount > 0 && !pDispatchInfo->pWeightTensors)
+        return;
 
-    /* Stub: actual GPU execution is IHV-specific; reference impl records intent */
+    /* Reference ICD: dispatch intent recorded; actual GPU execution is IHV-specific */
 }

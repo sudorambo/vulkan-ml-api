@@ -309,7 +309,8 @@ static void test_session_create_oom(void)
     memset(&ci, 0, sizeof(ci));
     ci.sType = (VkStructureType)VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR;
     ci.graph = (VkMLGraphKHR)(uintptr_t)0x1;
-    ci.scratchMemory = VK_NULL_HANDLE;
+    ci.scratchMemory = (VkDeviceMemory)(uintptr_t)0x1;
+    ci.scratchMemorySize = 256;
 
     FailingAllocatorData fad;
     VkAllocationCallbacks cb = make_failing_allocator(&fad);

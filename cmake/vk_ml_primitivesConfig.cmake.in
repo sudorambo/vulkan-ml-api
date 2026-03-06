@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Vulkan 1.3)
+
+include("${CMAKE_CURRENT_LIST_DIR}/vk_ml_primitivesTargets.cmake")
+
+check_required_components(vk_ml_primitives)

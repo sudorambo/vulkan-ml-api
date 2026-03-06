@@ -26,12 +26,30 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLSessionKHR(
     if (!session)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+    VkMLGraphKHR_T *g = (VkMLGraphKHR_T *)(uintptr_t)pCreateInfo->graph;
+
     session->graph = pCreateInfo->graph;
-    session->scratchMemory = pCreateInfo->scratchMemory;
-    session->scratchMemoryOffset = pCreateInfo->scratchMemoryOffset;
-    session->scratchMemorySize = pCreateInfo->scratchMemorySize;
-    session->autoAllocated = (pCreateInfo->scratchMemory == VK_NULL_HANDLE) ?
-        VK_TRUE : VK_FALSE;
+    session->autoAllocated = VK_FALSE;
+
+    if (pCreateInfo->scratchMemory != VK_NULL_HANDLE) {
+        session->scratchMemory = pCreateInfo->scratchMemory;
+        session->scratchMemoryOffset = pCreateInfo->scratchMemoryOffset;
+        session->scratchMemorySize = pCreateInfo->scratchMemorySize;
+    } else {
+        /* Auto-allocate scratch memory (reference implementation) */
+        VkDeviceSize needed = g->scratchMemorySize;
+        if (needed > 0) {
+            void *scratch = vk_ml_alloc(pAllocator, (size_t)needed);
+            if (!scratch) {
+                vk_ml_free(pAllocator, session);
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
+            session->scratchMemory = (VkDeviceMemory)(uintptr_t)scratch;
+            session->scratchMemoryOffset = 0;
+            session->scratchMemorySize = needed;
+            session->autoAllocated = VK_TRUE;
+        }
+    }
 
     *pSession = (VkMLSessionKHR)(uintptr_t)session;
     return VK_SUCCESS;
@@ -47,5 +65,7 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyMLSessionKHR(
         return;
 
     VkMLSessionKHR_T *s = (VkMLSessionKHR_T *)(uintptr_t)session;
+    if (s->autoAllocated && s->scratchMemory != VK_NULL_HANDLE)
+        vk_ml_free(pAllocator, (void *)(uintptr_t)s->scratchMemory);
     vk_ml_free(pAllocator, s);
 }

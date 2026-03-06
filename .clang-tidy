@@ -1,0 +1,14 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -misc-no-recursion
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'include/.*|src/.*|layers/.*'
+FormatStyle: file

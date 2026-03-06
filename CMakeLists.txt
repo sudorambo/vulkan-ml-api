@@ -21,6 +21,8 @@ endif()
 
 option(BUILD_TESTING "Build tests and examples" ON)
 
+include(GNUInstallDirs)
+
 # --------------------------------------------------------------------------
 # Library: vk_ml_primitives (reference ICD layer implementation)
 # --------------------------------------------------------------------------
@@ -37,7 +39,9 @@ set(ML_PRIMITIVES_SOURCES
 
 add_library(vk_ml_primitives STATIC ${ML_PRIMITIVES_SOURCES})
 target_include_directories(vk_ml_primitives
-    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_link_libraries(vk_ml_primitives PUBLIC Vulkan::Vulkan $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
@@ -55,7 +59,9 @@ set(VALIDATION_SOURCES
 
 add_library(vk_ml_validation STATIC ${VALIDATION_SOURCES})
 target_include_directories(vk_ml_validation
-    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/layers/validation
             ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -64,13 +70,45 @@ target_link_libraries(vk_ml_validation PUBLIC Vulkan::Vulkan)
 # --------------------------------------------------------------------------
 # Install targets
 # --------------------------------------------------------------------------
+include(CMakePackageConfigHelpers)
+
 install(TARGETS vk_ml_primitives vk_ml_validation
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+    EXPORT vk_ml_primitivesTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(DIRECTORY include/vulkan
-    DESTINATION include
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.h"
+)
+
+install(EXPORT vk_ml_primitivesTargets
+    FILE vk_ml_primitivesTargets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/vk_ml_primitives
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/vk_ml_primitivesConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitivesConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/vk_ml_primitives
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitivesConfigVersion.cmake
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitivesConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitivesConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/vk_ml_primitives
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/vk_ml_primitives.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitives.pc
+    @ONLY
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/vk_ml_primitives.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
 
 # --------------------------------------------------------------------------
@@ -114,6 +152,7 @@ add_test(NAME validation_test_vuids COMMAND test_vuids)
 set(UNIT_TESTS
     tests/unit/test_dag_validation.c
     tests/unit/test_descriptor_validation.c
+    tests/unit/test_validation_coverage.c
 )
 
 foreach(test_src ${UNIT_TESTS})

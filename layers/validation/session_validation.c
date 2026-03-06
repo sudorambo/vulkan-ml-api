@@ -18,7 +18,9 @@ VkBool32 vk_ml_validate_session_create(
     if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_ML_SESSION_CREATE_INFO_KHR)
         return VK_FALSE;
 
-    /* VUID_SESSION_GRAPH_VALID - graph handle must be valid (caller checks) */
+    /* VUID_SESSION_GRAPH_VALID */
+    if (pCreateInfo->graph == VK_NULL_HANDLE)
+        return VK_FALSE;
 
     if (pCreateInfo->scratchMemory != VK_NULL_HANDLE) {
         /* VUID_SESSION_SCRATCH_OFFSET_ALIGN */

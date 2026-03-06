@@ -270,6 +270,21 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
     if (!pCreateInfo || !pGraph)
         return VK_ERROR_UNKNOWN;
 
+    if (pCreateInfo->nodeCount == 0 || !pCreateInfo->pNodes)
+        return VK_ERROR_UNKNOWN;
+    if (pCreateInfo->externalInputCount == 0 || pCreateInfo->externalOutputCount == 0)
+        return VK_ERROR_UNKNOWN;
+
+    /* Validate primitive descriptors in each node */
+    for (uint32_t i = 0; i < pCreateInfo->nodeCount; i++) {
+        const VkMLGraphNodeCreateInfoKHR *node = &pCreateInfo->pNodes[i];
+        if (node->pOperationDesc) {
+            if (!vk_ml_validate_primitive_desc(node->operationType,
+                                               node->pOperationDesc))
+                return VK_ERROR_UNKNOWN;
+        }
+    }
+
     VkMLGraphKHR_T *graph = (VkMLGraphKHR_T *)vk_ml_alloc(pAllocator,
         sizeof(VkMLGraphKHR_T));
     if (!graph)

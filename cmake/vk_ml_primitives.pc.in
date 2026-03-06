@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: vk_ml_primitives
+Description: VK_KHR_ml_primitives Vulkan extension reference implementation
+Version: @PROJECT_VERSION@
+Requires: vulkan
+Cflags: -I${includedir}
+Libs: -L${libdir} -lvk_ml_primitives

@@ -22,9 +22,21 @@ VkBool32 vk_ml_validate_tensor_create(
     if (!features->tensorObjects)
         return VK_FALSE;
 
+    /* VUID_TENSOR_CREATE_DESC */
     const VkTensorDescriptionKHR *desc = pCreateInfo->pDescription;
     if (!desc)
         return VK_FALSE;
+
+    /* VUID_TENSOR_CREATE_SHARING_MODE */
+    if (pCreateInfo->sharingMode != VK_SHARING_MODE_EXCLUSIVE &&
+        pCreateInfo->sharingMode != VK_SHARING_MODE_CONCURRENT)
+        return VK_FALSE;
+
+    /* VUID_TENSOR_CREATE_SHARING_INDICES */
+    if (pCreateInfo->sharingMode == VK_SHARING_MODE_CONCURRENT) {
+        if (pCreateInfo->queueFamilyIndexCount < 2 || !pCreateInfo->pQueueFamilyIndices)
+            return VK_FALSE;
+    }
 
     /* VUID_TENSOR_DESC_DIM_COUNT */
     if (desc->dimensionCount == 0 || desc->dimensionCount > props->maxTensorDimensions)
@@ -147,10 +159,24 @@ VkBool32 vk_ml_validate_tensor_copy(
     if (pCopyInfo->srcTensor == pCopyInfo->dstTensor)
         return VK_FALSE;
 
-    /* VUID_COPY_TENSOR_CMD_STATE / VUID_COPY_TENSOR_FORMAT etc. require more context */
-    /* regionCount > 0 (VkCopyTensorInfoKHR-regionCount-00001) */
+    /* VUID_COPY_TENSOR_REGION_COUNT */
     if (pCopyInfo->regionCount == 0)
         return VK_FALSE;
+
+    if (!pCopyInfo->pRegions)
+        return VK_FALSE;
+
+    for (uint32_t i = 0; i < pCopyInfo->regionCount; i++) {
+        const VkTensorCopyKHR *region = &pCopyInfo->pRegions[i];
+        if ((int)region->sType != VK_STRUCTURE_TYPE_TENSOR_COPY_KHR)
+            return VK_FALSE;
+        /* VUID_COPY_TENSOR_SRC_OFFSETS */
+        if (region->dimensionCount > 0 && !region->pSrcOffsets)
+            return VK_FALSE;
+        /* VUID_COPY_TENSOR_DST_OFFSETS */
+        if (region->dimensionCount > 0 && !region->pDstOffsets)
+            return VK_FALSE;
+    }
 
     return VK_TRUE;
 }

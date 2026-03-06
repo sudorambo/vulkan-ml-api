@@ -1,0 +1,38 @@
+# Doxyfile for VK_KHR_ml_primitives
+
+PROJECT_NAME           = "VK_KHR_ml_primitives"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Vulkan ML Primitives Extension Reference Implementation"
+OUTPUT_DIRECTORY       = docs
+
+INPUT                  = include/vulkan/vulkan_ml_primitives.h \
+                         src/ \
+                         layers/validation/
+FILE_PATTERNS          = *.h *.c
+RECURSIVE              = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+
+GENERATE_LATEX         = NO
+
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+TYPEDEF_HIDES_STRUCT   = YES
+SORT_MEMBER_DOCS       = YES
+
+WARN_IF_UNDOCUMENTED   = YES
+WARN_NO_PARAMDOC       = YES
+
+PREDEFINED             = VKAPI_ATTR= \
+                         VKAPI_CALL= \
+                         VK_DEFINE_NON_DISPATCHABLE_HANDLE(x)="typedef uint64_t x;"
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+
+HAVE_DOT               = NO
