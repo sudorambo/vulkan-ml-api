@@ -4,7 +4,7 @@
  */
 
 #include "../../layers/validation/vk_ml_validation.h"
-#include "../../src/internal.h"
+#include "internal.h"
 #include <math.h>
 #include <stdio.h>
 

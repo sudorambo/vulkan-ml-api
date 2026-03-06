@@ -319,9 +319,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L7 — Inconsistent include paths for internal.h in tests
 
-- [ ] [P] **Files**: various test files
+- [x] [P] **Files**: various test files
 - **Description**: Some use `"internal.h"` (CMake-resolved), others use `"../../src/internal.h"` (relative).
 - **Fix**: Standardize on one approach. Prefer CMake `target_include_directories` with `"internal.h"`.
+- **FIXED**: Phase 44 (T205-T207). Changed `test_vuids.c` and `test_dag_validation.c` from `"../../src/internal.h"` to `"internal.h"`. All 13 tests pass.
 
 ### L8 — Stray .o files in project root
 

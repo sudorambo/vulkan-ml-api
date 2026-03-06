@@ -1601,6 +1601,31 @@ Total: 3 tasks.
 
 ---
 
+### Phase 44: Review Remediation — L7 (Inconsistent include paths for internal.h in tests)
+
+**Goal**: Standardize all test files to use `#include "internal.h"` (CMake-resolved) instead of relative paths.
+
+- [X] T205 [P] In `tests/validation/test_vuids.c`, change `#include "../../src/internal.h"` to `#include "internal.h"`.
+
+- [X] T206 [P] In `tests/unit/test_dag_validation.c`, change `#include "../../src/internal.h"` to `#include "internal.h"`.
+
+- [X] T207 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: All test files use consistent CMake-resolved include paths.
+
+---
+
+### Phase 44 Dependencies
+
+```text
+T205, T206 — parallel [P] (different files)
+T207 — depends on T205, T206
+
+Total: 3 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
