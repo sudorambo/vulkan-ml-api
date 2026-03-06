@@ -1683,6 +1683,29 @@ Total: 6 tasks.
 
 ---
 
+### Phase 47: Review Remediation — L11 (Resource leak in quickstart on partial tensor creation failure)
+
+**Goal**: Fix resource leak when tensor creation partially fails in the quickstart example.
+
+- [X] T217 In `examples/quickstart.c`, replace the tensor creation error path (lines 93–98) to destroy any partially-created tensors before returning. Since all three handles are initialized to `VK_NULL_HANDLE` and `vkDestroyTensorKHR` is safe on null handles, add `vkDestroyTensorKHR` calls for all three tensors in the error block.
+
+- [X] T218 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Quickstart example no longer leaks tensors on partial creation failure.
+
+---
+
+### Phase 47 Dependencies
+
+```text
+T217 — standalone
+T218 — depends on T217
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

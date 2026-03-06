@@ -345,9 +345,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### L11 — Resource leak in quickstart on partial tensor creation failure
 
-- [ ] **File**: `examples/quickstart.c:93-98`
+- [x] **File**: `examples/quickstart.c:93-98`
 - **Description**: If the first tensor creates successfully but the second fails, the first is leaked due to short-circuit `||`.
 - **Fix**: Create each tensor separately with individual error checking and cleanup, or use a `goto cleanup` pattern.
+- **FIXED**: Phase 47 (T217-T218). Added `vkDestroyTensorKHR` calls for all three tensors in the error path. Safe because handles are pre-initialized to `VK_NULL_HANDLE` and destroy is no-op on null. All 13 tests pass.
 
 ---
 

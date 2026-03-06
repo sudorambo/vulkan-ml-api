@@ -94,6 +94,9 @@ int main(void)
         vkCreateTensorKHR(device, &weight_ci, allocator, &weight_tensor) != VK_SUCCESS ||
         vkCreateTensorKHR(device, &output_ci, allocator, &output_tensor) != VK_SUCCESS) {
         fprintf(stderr, "Failed to create tensors\n");
+        vkDestroyTensorKHR(device, output_tensor, allocator);
+        vkDestroyTensorKHR(device, weight_tensor, allocator);
+        vkDestroyTensorKHR(device, input_tensor, allocator);
         return 1;
     }
 
