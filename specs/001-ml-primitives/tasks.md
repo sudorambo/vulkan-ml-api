@@ -743,6 +743,54 @@ Total: 5 tasks. All sequential.
 
 ---
 
+## Phase 18: Review Remediation — H7 (Create README.md)
+
+**Goal**: Create a comprehensive `README.md` at the repository root covering project description, build instructions, test instructions, directory structure, extension status, and link to the spec. Resolves HIGH finding H7 from `review-findings.md`.
+
+### Sub-phase 18a: Create README
+
+- [X] T123 Create `README.md` at the repository root with the following sections (all content derived from existing project artifacts):
+
+  1. **Title**: `VK_KHR_ml_primitives` with one-line tagline describing it as a Vulkan extension for GPU-accelerated ML.
+  2. **Overview**: One paragraph summarizing the extension — 4 new object types (`VkTensorKHR`, `VkTensorViewKHR`, `VkMLGraphKHR`, `VkMLSessionKHR`), 21 ML primitive operations, compiled graph dispatch, Vulkan 1.3 baseline.
+  3. **Extension Dependencies**: Bullet list — `VK_KHR_cooperative_matrix`, `VK_KHR_timeline_semaphore`, `VK_KHR_maintenance5`, `VK_KHR_format_feature_flags2`, `SPV_KHR_tensor`.
+  4. **Repository Structure**: Tree diagram matching actual on-disk layout:
+     - `include/vulkan/vulkan_ml_primitives.h` — public C header
+     - `src/` — reference ICD implementation (8 source files + `internal.h`)
+     - `layers/validation/` — validation layer (5 source files + `vk_ml_validation.h`)
+     - `tests/cts/` — 9 conformance test suites
+     - `tests/validation/` — VUID negative tests (`test_vuids.c`)
+     - `tests/unit/` — 2 unit test suites
+     - `examples/` — quickstart example
+     - `spec/` — authoritative `.adoc` specification
+     - `specs/` — design artifacts (plan, tasks, review findings)
+  5. **Prerequisites**: CMake 3.20+, Vulkan SDK 1.3+, C11 compiler (GCC 11+ / Clang 14+ / MSVC 2022+).
+  6. **Building**: `cmake -B build -S .` then `cmake --build build`.
+  7. **Running Tests**: `cd build && ctest --output-on-failure` — 12 test suites covering tensor lifecycle, views, copies, formats, graphs, sessions, dispatch, synchronization, SPIR-V, VUIDs, DAG validation, and descriptor validation.
+  8. **Quick Start**: Reference `examples/quickstart.c` with a brief summary of the workflow (create tensors → build graph → create session → dispatch → cleanup).
+  9. **Static Analysis**: Note that `clang-tidy` is auto-integrated via CMake (`CMAKE_C_CLANG_TIDY`); optional `cppcheck` target available via `cmake --build build --target cppcheck`.
+  10. **Specification**: Link to `spec/VK_KHR_ml_primitives.adoc`. Note extension revision 1, cross-vendor KHR status.
+  11. **License**: Placeholder section noting the license is TBD.
+
+### Sub-phase 18b: Verify README accuracy
+
+- [X] T124 Verify the README is accurate: (a) all directories/files mentioned in the tree diagram exist on disk, (b) the build commands (`cmake -B build -S . && cmake --build build`) succeed with zero warnings, (c) the test command (`cd build && ctest --output-on-failure`) runs 12 tests and all pass, (d) `examples/quickstart.c` is correctly referenced.
+
+**Checkpoint**: Repository has a comprehensive README. All referenced paths, commands, and counts are verified accurate.
+
+---
+
+### Phase 18 Dependencies
+
+```text
+Sub-phase 18a (create):  T123 — create README.md
+Sub-phase 18b (verify):  T124 — depends on T123
+
+Total: 2 tasks. Sequential.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

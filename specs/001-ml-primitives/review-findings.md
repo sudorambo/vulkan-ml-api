@@ -100,9 +100,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### H7 — No README.md
 
-- [ ] [P] **File**: repo root
+- [x] **File**: `README.md`
 - **Description**: The repository has no README. For a project of this scope, this is a significant gap for discoverability and onboarding.
 - **Fix**: Create `README.md` with: project description, build instructions, test instructions, directory structure guide, extension status, and link to the spec.
+- **FIXED**: Phase 18 (T123-T124). Created comprehensive README with 11 sections: overview, extension dependencies, repository structure tree, prerequisites, build instructions, test instructions (with 12-suite table), quick start guide, static analysis, specification link, and license placeholder. All 31 referenced paths verified on disk.
 
 ### H8 — No OOM / allocation-failure tests
 
