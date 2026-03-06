@@ -9,7 +9,6 @@
 #define VK_ML_VALIDATION_H_
 
 #include <vulkan/vulkan_ml_primitives.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

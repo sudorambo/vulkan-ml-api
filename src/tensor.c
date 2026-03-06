@@ -120,6 +120,7 @@ VKAPI_ATTR void VKAPI_CALL vkGetTensorMemoryRequirementsKHR(
     VkDeviceSize size = elementCount * elemSize;
 
     pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+    pMemoryRequirements->pNext = NULL;
     pMemoryRequirements->memoryRequirements.size = size;
     pMemoryRequirements->memoryRequirements.alignment = VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0xFFFFFFFFu;

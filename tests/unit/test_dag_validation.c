@@ -5,11 +5,8 @@
 
 #include <vulkan/vulkan_ml_primitives.h>
 #include "internal.h"
-#include "../../layers/validation/vk_ml_validation.h"
+#include "vk_ml_validation.h"
 #include <stdio.h>
-
-extern void vk_ml_populate_features(VkPhysicalDeviceMLFeaturesKHR *features);
-extern void vk_ml_populate_properties(VkPhysicalDeviceMLPropertiesKHR *props);
 
 static int passed;
 static int failed;

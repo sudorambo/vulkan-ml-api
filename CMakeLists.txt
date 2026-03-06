@@ -127,14 +127,17 @@ foreach(test_src ${UNIT_TESTS})
     add_test(NAME unit_${test_name} COMMAND ${test_name})
 endforeach()
 
+endif() # BUILD_TESTING
+
 # --------------------------------------------------------------------------
 # Examples
 # --------------------------------------------------------------------------
-add_executable(quickstart examples/quickstart.c)
-target_include_directories(quickstart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(quickstart PRIVATE vk_ml_primitives)
-
-endif() # BUILD_TESTING
+option(BUILD_EXAMPLES "Build example programs" ON)
+if(BUILD_EXAMPLES)
+    add_executable(quickstart examples/quickstart.c)
+    target_include_directories(quickstart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(quickstart PRIVATE vk_ml_primitives)
+endif()
 
 # --------------------------------------------------------------------------
 # Static analysis (T003)

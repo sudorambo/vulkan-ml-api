@@ -443,45 +443,52 @@ LOW (polish):
 
 #### L12 — README claims C11 but project uses C17
 
-- [ ] [P] **File**: `README.md:84`
+- [x] [P] **File**: `README.md:84`
 - **Description**: README says "C compiler with C11 support" but `CMakeLists.txt` sets `set(CMAKE_C_STANDARD 17)` (changed in Phase 42/L5 fix). The README was not updated to reflect this change.
 - **Fix**: Change "C11" to "C17" in the prerequisites section of README.md.
+- **FIXED**: Phase 50 (T232). Changed to "C compiler with C17 support".
 
 #### L13 — Unnecessary `#include <stdbool.h>` in `vk_ml_validation.h`
 
-- [ ] [P] **File**: `layers/validation/vk_ml_validation.h:12`
+- [x] [P] **File**: `layers/validation/vk_ml_validation.h:12`
 - **Description**: The validation header includes `<stdbool.h>` but exclusively uses `VkBool32`. The `bool` type is never used anywhere in the validation layer.
 - **Fix**: Remove `#include <stdbool.h>`.
+- **FIXED**: Phase 50 (T233). Removed the unused include.
 
 #### L14 — Quickstart example inside `BUILD_TESTING` guard
 
-- [ ] [P] **File**: `CMakeLists.txt:132`
+- [x] [P] **File**: `CMakeLists.txt:132`
 - **Description**: The quickstart example is wrapped inside `if(BUILD_TESTING)`. Examples and tests are distinct concerns. Library consumers who set `-DBUILD_TESTING=OFF` lose access to the example.
 - **Fix**: Either move the example section outside the `if(BUILD_TESTING)` block, or add a separate `option(BUILD_EXAMPLES "Build examples" ON)` guard.
+- **FIXED**: Phase 50 (T234, T244). Moved example outside `BUILD_TESTING`, added `option(BUILD_EXAMPLES)` guard. Verified quickstart builds with `BUILD_TESTING=OFF`.
 
 #### L15 — Hardcoded valid usage bitmask in tensor validation
 
-- [ ] [P] **File**: `layers/validation/tensor_validation.c:70`
+- [x] [P] **File**: `layers/validation/tensor_validation.c:70`
 - **Description**: `const VkFlags validUsageMask = 0x7F` is a magic number corresponding to the 7 defined `VkTensorUsageFlagBitsKHR` values. If a new usage flag is added to the enum, this mask will silently become stale and reject valid usage combinations.
 - **Fix**: Derive the mask from the highest defined bit: `const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;`
+- **FIXED**: Phase 50 (T235). Replaced `0x7F` with self-deriving expression from highest enum bit.
 
 #### L16 — Wasteful temporary allocation in `deep_copy_tensor_desc` usage
 
-- [ ] **File**: `src/ml_graph.c:319-323, 339-343, 359-363`
+- [x] **File**: `src/ml_graph.c:319-323, 339-343, 359-363`
 - **Description**: External input/output/weight descriptions are deep-copied via `deep_copy_tensor_desc()` which allocates a new struct, then the caller shallow-copies it into the destination array and immediately frees the shell. This repeats 3 times (inputs, outputs, weights), allocating and immediately freeing a struct per description — wasteful.
 - **Fix**: Add a direct "copy-in-place" helper `deep_copy_tensor_desc_into(VkTensorDescriptionKHR *dst, const VkTensorDescriptionKHR *src, allocator)` that copies directly into the destination, eliminating the temporary allocation.
+- **FIXED**: Phase 50 (T236-T237). Added `deep_copy_tensor_desc_into()` returning `VkResult`. Replaced all 3 copy loops to use the new helper. Original `deep_copy_tensor_desc()` retained for node binding use case. All 13 tests pass.
 
 #### L17 — Test files use relative paths for `vk_ml_validation.h` despite CMake support
 
-- [ ] [P] **Files**: `tests/validation/test_vuids.c:6`, `tests/unit/test_dag_validation.c:8`, `tests/unit/test_descriptor_validation.c:7`
+- [x] [P] **Files**: `tests/validation/test_vuids.c:6`, `tests/unit/test_dag_validation.c:8`, `tests/unit/test_descriptor_validation.c:7`
 - **Description**: All three use `#include "../../layers/validation/vk_ml_validation.h"` even though their CMake targets include `layers/validation/` as a PRIVATE include directory. Should use `#include "vk_ml_validation.h"`.
 - **Fix**: Change to `#include "vk_ml_validation.h"` in all three files.
+- **FIXED**: Phase 50 (T238-T240). Changed all three files to `#include "vk_ml_validation.h"`. Also removed redundant `extern` declarations in `test_dag_validation.c` and `test_descriptor_validation.c`, added missing `#include "internal.h"` to `test_descriptor_validation.c`. All 13 tests pass.
 
 #### L18 — Memory requirement functions don't clear `pNext`
 
-- [ ] [P] **Files**: `src/tensor.c:122`, `src/ml_graph.c:417`
+- [x] [P] **Files**: `src/tensor.c:122`, `src/ml_graph.c:417`
 - **Description**: `vkGetTensorMemoryRequirementsKHR` and `vkGetMLGraphMemoryRequirementsKHR` set `sType` and `memoryRequirements` but leave `pNext` untouched. While callers are responsible for initializing the struct, a defensive `pMemoryRequirements->pNext = NULL` would prevent stale pointer issues and align with Vulkan conventions for output structs.
 - **Fix**: Add `pMemoryRequirements->pNext = NULL;` after setting `sType` in both functions.
+- **FIXED**: Phase 50 (T241-T242). Added `pMemoryRequirements->pNext = NULL;` in both `vkGetTensorMemoryRequirementsKHR` and `vkGetMLGraphMemoryRequirementsKHR`. All 13 tests pass.
 
 ---
 

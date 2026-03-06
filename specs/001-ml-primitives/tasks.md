@@ -1789,6 +1789,117 @@ Total: 9 tasks.
 
 ---
 
+## Phase 50: Review Remediation — L12–L18 (Low-Severity Polish Batch)
+
+**Goal**: Batch remediation of 7 independent LOW-severity polish findings from Review 2. No behavioral changes — documentation accuracy, dead code removal, build structure improvement, magic number elimination, allocation optimization, include path consistency, and defensive initialization.
+
+- [x] T232 [P] In `README.md`, change `"C compiler with C11 support"` (line 84) to `"C compiler with C17 support"`. The project's `CMakeLists.txt` sets `CMAKE_C_STANDARD 17` since Phase 42, but the README was never updated.
+
+- [x] T233 [P] In `layers/validation/vk_ml_validation.h`, remove `#include <stdbool.h>` (line 12). The validation layer exclusively uses `VkBool32`; the `bool` type from `<stdbool.h>` is never referenced in any validation source or header file.
+
+- [x] T234 In `CMakeLists.txt`, move the quickstart example build out of the `if(BUILD_TESTING)` block (currently at lines 130–137). Add a separate guard:
+  ```
+  option(BUILD_EXAMPLES "Build example programs" ON)
+  if(BUILD_EXAMPLES)
+      add_executable(quickstart examples/quickstart.c)
+      target_include_directories(quickstart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+      target_link_libraries(quickstart PRIVATE vk_ml_primitives)
+  endif()
+  ```
+  Place this new block after `endif() # BUILD_TESTING` and before the static analysis section. The quickstart only links `vk_ml_primitives`, not the validation library, so it is independent of the test infrastructure.
+
+- [x] T235 [P] In `layers/validation/tensor_validation.c`, replace the hardcoded magic number `const VkFlags validUsageMask = 0x7F;` (line 70) with `const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;`. This derives the mask from the highest defined enum bit, making it self-updating if new usage flags are added. The result is identical today (`0x40 << 1 - 1 = 0x7F`).
+
+- [x] T236 In `src/ml_graph.c`, add a new static helper `deep_copy_tensor_desc_into` immediately after the existing `deep_copy_tensor_desc` function (after line 56). The function copies tensor description fields directly into a caller-provided destination, eliminating the temporary shell allocation:
+  ```c
+  static VkResult deep_copy_tensor_desc_into(
+      VkTensorDescriptionKHR *dst,
+      const VkTensorDescriptionKHR *src,
+      const VkAllocationCallbacks *pAllocator)
+  {
+      *dst = *src;
+      dst->pNext = NULL;
+      dst->pDimensions = NULL;
+      dst->pStrides = NULL;
+
+      if (src->dimensionCount > 0 && src->pDimensions) {
+          dst->pDimensions = (const uint32_t *)vk_ml_alloc(pAllocator,
+              src->dimensionCount * sizeof(uint32_t));
+          if (!dst->pDimensions)
+              return VK_ERROR_OUT_OF_HOST_MEMORY;
+          memcpy((void *)dst->pDimensions, src->pDimensions,
+              src->dimensionCount * sizeof(uint32_t));
+      }
+      if (src->dimensionCount > 0 && src->pStrides) {
+          dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator,
+              src->dimensionCount * sizeof(VkDeviceSize));
+          if (!dst->pStrides) {
+              vk_ml_free(pAllocator, (void *)dst->pDimensions);
+              dst->pDimensions = NULL;
+              return VK_ERROR_OUT_OF_HOST_MEMORY;
+          }
+          memcpy((void *)dst->pStrides, src->pStrides,
+              src->dimensionCount * sizeof(VkDeviceSize));
+      }
+      return VK_SUCCESS;
+  }
+  ```
+  The existing `deep_copy_tensor_desc()` is kept for the node binding use case at line 143.
+
+- [x] T237 In `src/ml_graph.c`, replace the three deep-copy loops (external inputs at lines 318–324, external outputs at lines 338–344, constant weights at lines 358–364) to use the new `deep_copy_tensor_desc_into` helper instead of `deep_copy_tensor_desc` + shallow copy + free. Each loop body changes from:
+  ```c
+  VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(...);
+  if (!copy) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
+  graph->...Descs[i] = *copy;
+  vk_ml_free(pAllocator, copy);
+  ```
+  to:
+  ```c
+  result = deep_copy_tensor_desc_into(&graph->...Descs[i], &src[i], pAllocator);
+  if (result != VK_SUCCESS) goto cleanup;
+  ```
+  This must be done for all three loops (inputs, outputs, weights). Depends on T236.
+
+- [x] T238 [P] In `tests/validation/test_vuids.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 6) to `#include "vk_ml_validation.h"`. The CMake target already provides `layers/validation/` as a PRIVATE include directory.
+
+- [x] T239 [P] In `tests/unit/test_dag_validation.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 8) to `#include "vk_ml_validation.h"`. Also remove the two redundant `extern` declarations on lines 11–12 (`extern void vk_ml_populate_features(...)` and `extern void vk_ml_populate_properties(...)`). Both are already declared in `internal.h` which is included on line 7.
+
+- [x] T240 [P] In `tests/unit/test_descriptor_validation.c`, change `#include "../../layers/validation/vk_ml_validation.h"` (line 7) to `#include "vk_ml_validation.h"`. Also remove the redundant `extern void vk_ml_populate_features(...)` declaration on line 12. Added `#include "internal.h"` to provide the declaration.
+
+- [x] T241 [P] In `src/tensor.c`, add `pMemoryRequirements->pNext = NULL;` immediately after line 122 (`pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;`) in `vkGetTensorMemoryRequirementsKHR`. This defensively clears the `pNext` pointer in the output struct, aligning with Vulkan conventions for output-only structures.
+
+- [x] T242 [P] In `src/ml_graph.c`, add `pMemoryRequirements->pNext = NULL;` immediately after line 417 (`pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;`) in `vkGetMLGraphMemoryRequirementsKHR`. Same rationale as T241.
+
+- [x] T243 Build with `cmake -S . -B build -DBUILD_TESTING=ON` and `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+- [x] T244 Verify L14 fix: run `cmake -S . -B build_notest -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=ON && cmake --build build_notest --target quickstart` — quickstart builds successfully without the test infrastructure. Then clean up: `rm -rf build_notest`.
+
+**Checkpoint**: All LOW-severity Review 2 findings (L12–L18) remediated. README accurate, dead includes removed, build structure improved, magic number eliminated, allocation pattern optimized, include paths consistent, output structs defensively initialized. Zero warnings, 13/13 tests pass.
+
+---
+
+### Phase 50 Dependencies
+
+```text
+T232 — standalone [P] (README.md)
+T233 — standalone [P] (vk_ml_validation.h)
+T234 — standalone (CMakeLists.txt)
+T235 — standalone [P] (tensor_validation.c)
+T236 — standalone (ml_graph.c — add helper)
+T237 — depends on T236 (ml_graph.c — use helper)
+T238 — standalone [P] (test_vuids.c)
+T239 — standalone [P] (test_dag_validation.c)
+T240 — standalone [P] (test_descriptor_validation.c)
+T241 — standalone [P] (tensor.c)
+T242 — standalone [P] (ml_graph.c — pNext)
+T243 — depends on T232–T242 (build + test)
+T244 — depends on T234, T243 (BUILD_TESTING=OFF verification)
+
+Total: 13 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks

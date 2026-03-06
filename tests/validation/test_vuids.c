@@ -3,7 +3,7 @@
  * @brief Validation layer VUID tests for VK_KHR_ml_primitives.
  */
 
-#include "../../layers/validation/vk_ml_validation.h"
+#include "vk_ml_validation.h"
 #include "internal.h"
 #include <math.h>
 #include <stdio.h>

@@ -58,6 +58,38 @@ static VkTensorDescriptionKHR *deep_copy_tensor_desc(
     return dst;
 }
 
+static VkResult deep_copy_tensor_desc_into(
+    VkTensorDescriptionKHR *dst,
+    const VkTensorDescriptionKHR *src,
+    const VkAllocationCallbacks *pAllocator)
+{
+    *dst = *src;
+    dst->pNext = NULL;
+    dst->pDimensions = NULL;
+    dst->pStrides = NULL;
+
+    if (src->dimensionCount > 0 && src->pDimensions) {
+        dst->pDimensions = (const uint32_t *)vk_ml_alloc(pAllocator,
+            src->dimensionCount * sizeof(uint32_t));
+        if (!dst->pDimensions)
+            return VK_ERROR_OUT_OF_HOST_MEMORY;
+        memcpy((void *)dst->pDimensions, src->pDimensions,
+            src->dimensionCount * sizeof(uint32_t));
+    }
+    if (src->dimensionCount > 0 && src->pStrides) {
+        dst->pStrides = (const VkDeviceSize *)vk_ml_alloc(pAllocator,
+            src->dimensionCount * sizeof(VkDeviceSize));
+        if (!dst->pStrides) {
+            vk_ml_free(pAllocator, (void *)dst->pDimensions);
+            dst->pDimensions = NULL;
+            return VK_ERROR_OUT_OF_HOST_MEMORY;
+        }
+        memcpy((void *)dst->pStrides, src->pStrides,
+            src->dimensionCount * sizeof(VkDeviceSize));
+    }
+    return VK_SUCCESS;
+}
+
 static void free_tensor_desc_arrays(VkTensorDescriptionKHR *desc,
                                     const VkAllocationCallbacks *pAllocator)
 {
@@ -316,11 +348,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         memset(graph->externalInputDescs, 0,
             pCreateInfo->externalInputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalInputCount; i++) {
-            VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
+            result = deep_copy_tensor_desc_into(
+                &graph->externalInputDescs[i],
                 &pCreateInfo->pExternalInputDescriptions[i], pAllocator);
-            if (!copy) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
-            graph->externalInputDescs[i] = *copy;
-            vk_ml_free(pAllocator, copy);
+            if (result != VK_SUCCESS) goto cleanup;
         }
     }
 
@@ -336,11 +367,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         memset(graph->externalOutputDescs, 0,
             pCreateInfo->externalOutputCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->externalOutputCount; i++) {
-            VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
+            result = deep_copy_tensor_desc_into(
+                &graph->externalOutputDescs[i],
                 &pCreateInfo->pExternalOutputDescriptions[i], pAllocator);
-            if (!copy) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
-            graph->externalOutputDescs[i] = *copy;
-            vk_ml_free(pAllocator, copy);
+            if (result != VK_SUCCESS) goto cleanup;
         }
     }
 
@@ -356,11 +386,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateMLGraphKHR(
         memset(graph->constantWeightDescs, 0,
             pCreateInfo->constantWeightCount * sizeof(VkTensorDescriptionKHR));
         for (uint32_t i = 0; i < pCreateInfo->constantWeightCount; i++) {
-            VkTensorDescriptionKHR *copy = deep_copy_tensor_desc(
+            result = deep_copy_tensor_desc_into(
+                &graph->constantWeightDescs[i],
                 &pCreateInfo->pConstantWeightDescriptions[i], pAllocator);
-            if (!copy) { result = VK_ERROR_OUT_OF_HOST_MEMORY; goto cleanup; }
-            graph->constantWeightDescs[i] = *copy;
-            vk_ml_free(pAllocator, copy);
+            if (result != VK_SUCCESS) goto cleanup;
         }
     }
 
@@ -415,6 +444,7 @@ VKAPI_ATTR void VKAPI_CALL vkGetMLGraphMemoryRequirementsKHR(
     VkMLGraphKHR_T *g = (VkMLGraphKHR_T *)(uintptr_t)graph;
 
     pMemoryRequirements->sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+    pMemoryRequirements->pNext = NULL;
     pMemoryRequirements->memoryRequirements.size = g->scratchMemorySize;
     pMemoryRequirements->memoryRequirements.alignment = VK_ML_REF_MIN_TENSOR_MEMORY_ALIGN;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0xFFFFFFFFu;

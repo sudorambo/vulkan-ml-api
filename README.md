@@ -81,7 +81,7 @@ CMakeLists.txt                          Root build configuration
 
 - **CMake** 3.20+
 - **Vulkan SDK** 1.3+ (headers and loader)
-- **C compiler** with C11 support:
+- **C compiler** with C17 support:
   - GCC 11+
   - Clang 14+
   - MSVC 2022+

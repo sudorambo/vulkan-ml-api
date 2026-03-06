@@ -67,7 +67,7 @@ VkBool32 vk_ml_validate_tensor_create(
     /* VUID_TENSOR_USAGE */
     if (desc->usage == 0)
         return VK_FALSE;
-    const VkFlags validUsageMask = 0x7F;
+    const VkFlags validUsageMask = (VK_TENSOR_USAGE_IMAGE_ALIASING_BIT_KHR << 1) - 1;
     if (desc->usage & ~validUsageMask)
         return VK_FALSE;
 
