@@ -219,9 +219,10 @@ Work through findings top-down by severity. Some fixes are independent and can b
 
 ### M13 — Tensor view doesn't check tensor has memory bound
 
-- [ ] **File**: `layers/validation/tensor_validation.c:66-93`
+- [x] **File**: `layers/validation/tensor_validation.c:85-87`
 - **Description**: The API docs state "The source tensor must have memory bound," but `vk_ml_validate_tensor_view_create` doesn't check `tensor->memoryBound`.
 - **Fix**: Add `if (!tensor->memoryBound) return VK_FALSE;`
+- **FIXED**: Phase 33 (T172). Added `/* VUID_TENSOR_VIEW_MEMORY_BOUND */ if (!tensor->memoryBound) return VK_FALSE;` after sType check, before format validation. All 13 tests pass.
 
 ### M14 — VUID coverage only 59%
 

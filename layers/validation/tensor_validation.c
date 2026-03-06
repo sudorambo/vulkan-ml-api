@@ -83,6 +83,10 @@ VkBool32 vk_ml_validate_tensor_view_create(
     if ((int)pCreateInfo->sType != VK_STRUCTURE_TYPE_TENSOR_VIEW_CREATE_INFO_KHR)
         return VK_FALSE;
 
+    /* VUID_TENSOR_VIEW_MEMORY_BOUND */
+    if (!tensor->memoryBound)
+        return VK_FALSE;
+
     /* VUID_TENSOR_VIEW_FORMAT */
     uint32_t tensorElemSize = vk_ml_format_element_size(tensor->description.format);
     uint32_t viewElemSize = vk_ml_format_element_size(pCreateInfo->format);

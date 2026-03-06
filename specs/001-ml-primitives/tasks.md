@@ -1315,6 +1315,29 @@ Total: 2 tasks.
 
 ---
 
+## Phase 33: Review Remediation — M13 (Tensor view doesn't check tensor has memory bound)
+
+**Goal**: Reject tensor view creation when the source tensor has no memory bound. Validation-layer-only change. Resolves MEDIUM finding M13 from `review-findings.md`.
+
+- [X] T172 In `layers/validation/tensor_validation.c`, inside `vk_ml_validate_tensor_view_create`, after the sType check (line 84) and before the format validation (line 86), add: `/* VUID_TENSOR_VIEW_MEMORY_BOUND */ if (!tensor->memoryBound) return VK_FALSE;`
+
+- [X] T173 Build with `cmake --build build` — zero warnings. Run `ctest --output-on-failure` — all 13 tests pass.
+
+**Checkpoint**: Tensor view validation now rejects views over tensors without bound memory. All 13 tests pass.
+
+---
+
+### Phase 33 Dependencies
+
+```text
+T172 — sequential (single file)
+T173 — depends on T172
+
+Total: 2 tasks.
+```
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies on incomplete tasks
